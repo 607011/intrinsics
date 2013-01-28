@@ -1,7 +1,6 @@
 // Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
 
 #include <Windows.h>
-#include <immintrin.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <fstream>
@@ -13,6 +12,7 @@
 #include "mersenne_twister.h"
 #include "marsaglia.h"
 #include "mcg.h"
+#include "rdrand.h"
 
 static const int DEFAULT_CHUNK_COUNT = 10;
 static const int DEFAULT_CHUNK_SIZE = 32*1024*1024;
@@ -23,8 +23,12 @@ BYTE* rngBuf = NULL;
 MersenneTwister mt;
 MCG mcg;
 MultiplyWithCarry mwc;
+DummyGenerator dummy;
+RdRand16 rdrand16;
+RdRand32 rdrand32;
 bool doAppend = false;
-bool noWrite = false;
+bool doWrite = true;
+int verbose = 0;
 int threadPriority = THREAD_PRIORITY_NORMAL;
 
 
@@ -39,9 +43,15 @@ static struct option long_options[] = {
 };
 
 
-void runBenchmark(void(*f)(int), const char* name, const char* outputFilename, int bytesPerIter = 0) {
+inline int roundup(int x, int bits) {
+	return ((x)>>(bits)<<(bits)) + (1<<bits);
+}
+
+
+template <typename T>
+void runBenchmark(AbstractRandomNumberGenerator<T>& gen, const char* name, const char* outputFilename) {
     std::ofstream fs;
-    if (outputFilename != NULL && !noWrite)
+    if (outputFilename != NULL && doWrite)
     {
         fs.open(outputFilename, (doAppend
             ? (std::ios::binary | std::ios::out | std::ios::app | std::ios::ate)
@@ -55,79 +65,32 @@ void runBenchmark(void(*f)(int), const char* name, const char* outputFilename, i
 
 	__int64 tMin = MAXLONGLONG;
 	__int64 ticksMin = MAXLONGLONG;
-	std::cout << name << " ";
+	std::cout.setf(std::ios_base::left, std::ios_base::adjustfield);
+	std::cout << std::setfill('_') << std::setw(18) << name << " ";
 	for (int i = 0; i < chunkCount; ++i) {
 		std::cout << '.' << std::flush;
 		__int64 t, ticks;
 		{
 			Stopwatch stopwatch(t, ticks);
-			(*f)(chunkSize);
+			T* rn = (T*)rngBuf;
+			const T* rne = rn + chunkSize / sizeof(T);
+			while (rn < rne)
+				gen.next(*rn++);
 		}
 		if (t < tMin)
 			tMin = t;
 		if (ticks < ticksMin)
 			ticksMin = ticks;
-		if (bytesPerIter > 0 && fs.is_open()) {
+		if (fs.is_open()) {
 			fs.write((char*)rngBuf, chunkSize);
 			std::cout << "\b+" << std::flush;
 		}
 	}
+	std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
 	std::cout << ' ' << std::setfill(' ') << std::setw(5) << tMin << " ms, " 
 		<< std::fixed << std::setw(8) << std::setprecision(2) << (float)chunkSize/1024/1024/(1e-3*tMin) << " Mbyte/s"
 		<< std::endl;
 	fs.close();
-}
-
-
-void dummyTest(int n) {
-	volatile int dummy = 0;
-	for (int i = 0; i < n; ++i)
-		++dummy;
-}
-
-
-template <typename T>
-void mtTest(int n) {
-	T* rn = (T*)rngBuf;
-	const T* rne = rn + n / sizeof(T);
-	while (rn < rne)
-		*rn++ = mt();
-}
-
-
-template <typename T>
-void mcgTest(int n) {
-	T* rn = rngBuf;
-	const T* rne = rn + n / sizeof(T);
-	while (rn < rne)
-		*rn++ = mcg();
-}
-
-
-template <typename T>
-void mwcTest(int n) {
-	T* rn = (T*)rngBuf;
-	const T* rne = rn + n / sizeof(T);
-	while (rn < rne)
-		*rn++ = mwc();
-}
-
-
-template <typename T>
-void rdrand16Test(int n) {
-	T* rn = (T*)rngBuf;
-	const T* rne = rn + n / sizeof(T);
-	while (rn < rne)
-		_rdrand16_step(rn++);
-}
-
-
-template <typename T>
-void rdrand32Test(int n) {
-	T* rn = (T*)rngBuf;
-	const T* rne = rn + n / sizeof(T);
-	while (rn < rne)
-		_rdrand32_step(rn++);
 }
 
 
@@ -170,11 +133,15 @@ void disclaimer(void) {
 }
 
 
+const char* B[2] = { "false", "true" };
+
+
 int main(int argc, char* argv[]) {
 	threadPriority = GetThreadPriority(GetCurrentThread());
-    for (;;) {
+
+	for (;;) {
         int option_index = 0;
-        int c = getopt_long(argc, argv, "h?n:s:", long_options, &option_index);
+        int c = getopt_long(argc, argv, "vh?n:s:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c)
@@ -182,6 +149,9 @@ int main(int argc, char* argv[]) {
         case SELECT_APPEND:
             doAppend = true;
             break;
+		case 'v':
+			++verbose;
+			break;
         case 'h':
             // fall-through
         case '?':
@@ -192,7 +162,7 @@ int main(int argc, char* argv[]) {
             return 0;
             break;
 		case SELECT_NO_WRITE:
-			noWrite = true;
+			doWrite = false;
 			break;
         case 's':
             if (optarg == NULL)
@@ -219,18 +189,50 @@ int main(int argc, char* argv[]) {
 			return EXIT_FAILURE;
 		}
 	}
-	rngBuf = new BYTE[chunkSize];
 
-	runBenchmark(&dummyTest, "empty loop       ", NULL);
+	int cpureg[4] = { 0, 0, 0, 0 };
+	__cpuid(cpureg, 1);
+	bool sse3_supported =   (cpureg[2] & (1<<0))  != 0;
+	bool sse41_supported =  (cpureg[2] & (1<<19)) != 0;
+	bool sse42_supported =  (cpureg[2] & (1<<20)) != 0;
+	bool popcnt_supported = (cpureg[2] & (1<<23)) != 0;
+	bool aes_supported =    (cpureg[2] & (1<<25)) != 0;
+	bool avx_supported =    (cpureg[2] & (1<<28)) != 0;
+	bool b29_supported =    (cpureg[2] & (1<<29)) != 0;
+	bool rdrand_supported = (cpureg[2] & (1<<30)) != 0;
+	bool b31_supported =    (cpureg[2] & (1<<31)) != 0;
+	if (verbose > 0) {
+		std::cout << "[[ SSE3   : " << B[sse3_supported] << std::endl;
+		std::cout << "[[ SSE4.1 : " << B[sse41_supported] << std::endl;
+		std::cout << "[[ SSE4.2 : " << B[sse42_supported] << std::endl;
+		std::cout << "[[ POPCNT : " << B[popcnt_supported] << std::endl;
+		std::cout << "[[ AVX    : " << B[avx_supported] << std::endl;
+		std::cout << "[[ AES    : " << B[aes_supported] << std::endl;
+		std::cout << "[[ 1<<29  : " << B[b29_supported] << std::endl;
+		std::cout << "[[ RDRAND : " << B[rdrand_supported] << std::endl;
+		std::cout << "[[ 1<<31  : " << B[b31_supported] << std::endl;
+	}
+
+	chunkSize = roundup(chunkSize, 2);
+	rngBuf = new BYTE[chunkSize];
+	
+	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS); 
+	// warmup to turbo mode
+	runBenchmark<unsigned char>(dummy, "empty loop", NULL);
 
 	mwc.seed(GetTickCount());
-	runBenchmark(&mwcTest<unsigned int>,  "Marsaglia (MWC)  ", "mwc.dat");
+	runBenchmark<unsigned int>(mwc, "Marsaglia (MWC)", "mwc.dat");
 
 	mcg.seed(GetTickCount());
-	runBenchmark(&mcgTest<unsigned char>, "MCG              ", "mcg.dat");
+	runBenchmark<unsigned char>(mcg, "MCG", "mcg.dat");
 
 	mt.seed(GetTickCount());
-	runBenchmark(&mtTest<unsigned int>,   "Mersenne-Twister ", "mt.dat");
+	runBenchmark<unsigned int>(mt, "Mersenne-Twister", "mt.dat");
+
+	if (rdrand_supported) {
+		runBenchmark<unsigned short>(rdrand16, "_rdrand16_step", "mt.dat");
+		runBenchmark<unsigned int>(rdrand32, "_rdrand32_step", "mt.dat");
+	}
 
 	delete [] rngBuf;
 	SetThreadPriority(GetCurrentThread(), threadPriority);

@@ -88,6 +88,7 @@
     <ClInclude Include="marsaglia.h" />
     <ClInclude Include="mcg.h" />
     <ClInclude Include="mersenne_twister.h" />
+    <ClInclude Include="rdrand.h" />
     <ClInclude Include="stopwatch.h" />
   </ItemGroup>
   <ItemGroup>
