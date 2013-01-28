@@ -1,0 +1,12 @@
+*.pro.user
+*.dat
+*.sdf
+*.opensdf
+*.suo
+*.user
+Debug/*
+Release/*
+getopt/Debug/*
+getopt/Release/*
+rdrand/Debug/*
+rdrand/Release/*
