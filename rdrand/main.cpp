@@ -1,11 +1,12 @@
 // Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
 
 #include <Windows.h>
-#include <stdio.h>
-#include <getopt.h>
+#include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <getopt.h>
 
 #include "stopwatch.h"
 #include "abstract_random_number_generator.h"
@@ -26,6 +27,9 @@ MultiplyWithCarry mwc;
 DummyGenerator dummy;
 RdRand16 rdrand16;
 RdRand32 rdrand32;
+#if defined(_M_X64)
+RdRand64 rdrand64;
+#endif
 bool doAppend = false;
 bool doWrite = true;
 int verbose = 0;
@@ -41,6 +45,8 @@ static struct option long_options[] = {
     { "no-write",             no_argument, 0, SELECT_NO_WRITE },
     { "help",                 no_argument, 0, SELECT_HELP },
 };
+
+static const char* B[2] = { "false", "true" };
 
 
 inline int roundup(int x, int bits) {
@@ -71,9 +77,9 @@ void runBenchmark(AbstractRandomNumberGenerator<T>& gen, const char* name, const
 		std::cout << '.' << std::flush;
 		__int64 t, ticks;
 		{
-			Stopwatch stopwatch(t, ticks);
 			T* rn = (T*)rngBuf;
 			const T* rne = rn + chunkSize / sizeof(T);
+			Stopwatch stopwatch(t, ticks);
 			while (rn < rne)
 				gen.next(*rn++);
 		}
@@ -91,6 +97,15 @@ void runBenchmark(AbstractRandomNumberGenerator<T>& gen, const char* name, const
 		<< std::fixed << std::setw(8) << std::setprecision(2) << (float)chunkSize/1024/1024/(1e-3*tMin) << " Mbyte/s"
 		<< std::endl;
 	fs.close();
+}
+
+
+bool isGenuineIntelCPU(void) {
+	int cpureg[4] = { 0x0, 0x0, 0x0, 0x0 };
+	__cpuid(cpureg, 0);
+	return memcmp((char*)&cpureg[1], "Genu", 4) == 0
+		&& memcmp((char*)&cpureg[2], "ntel", 4) == 0
+		&& memcmp((char*)&cpureg[3], "ineI", 4) == 0;
 }
 
 
@@ -133,9 +148,6 @@ void disclaimer(void) {
 }
 
 
-const char* B[2] = { "false", "true" };
-
-
 int main(int argc, char* argv[]) {
 	threadPriority = GetThreadPriority(GetCurrentThread());
 
@@ -159,14 +171,13 @@ int main(int argc, char* argv[]) {
         case SELECT_HELP:
             disclaimer();
             usage();
-            return 0;
-            break;
+            return EXIT_SUCCESS;
+			break;
 		case SELECT_NO_WRITE:
 			doWrite = false;
 			break;
         case 's':
-            if (optarg == NULL)
-            {
+            if (optarg == NULL) {
                 usage();
                 exit(EXIT_FAILURE);
             }
@@ -175,8 +186,7 @@ int main(int argc, char* argv[]) {
                 chunkSize = DEFAULT_CHUNK_SIZE;
             break;
         case 'n':
-            if (optarg == NULL)
-            {
+            if (optarg == NULL) {
                 usage();
                 exit(EXIT_FAILURE);
             }
@@ -190,7 +200,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	int cpureg[4] = { 0, 0, 0, 0 };
+	int cpureg[4] = { 0x0, 0x0, 0x0, 0x0 };
 	__cpuid(cpureg, 1);
 	bool sse3_supported =   (cpureg[2] & (1<<0))  != 0;
 	bool sse41_supported =  (cpureg[2] & (1<<19)) != 0;
@@ -202,21 +212,22 @@ int main(int argc, char* argv[]) {
 	bool rdrand_supported = (cpureg[2] & (1<<30)) != 0;
 	bool b31_supported =    (cpureg[2] & (1<<31)) != 0;
 	if (verbose > 0) {
-		std::cout << "[[ SSE3   : " << B[sse3_supported] << std::endl;
-		std::cout << "[[ SSE4.1 : " << B[sse41_supported] << std::endl;
-		std::cout << "[[ SSE4.2 : " << B[sse42_supported] << std::endl;
-		std::cout << "[[ POPCNT : " << B[popcnt_supported] << std::endl;
-		std::cout << "[[ AVX    : " << B[avx_supported] << std::endl;
-		std::cout << "[[ AES    : " << B[aes_supported] << std::endl;
-		std::cout << "[[ 1<<29  : " << B[b29_supported] << std::endl;
-		std::cout << "[[ RDRAND : " << B[rdrand_supported] << std::endl;
-		std::cout << "[[ 1<<31  : " << B[b31_supported] << std::endl;
+		std::cout << ">>> SSE3   : " << B[sse3_supported] << std::endl;
+		std::cout << ">>> SSE4.1 : " << B[sse41_supported] << std::endl;
+		std::cout << ">>> SSE4.2 : " << B[sse42_supported] << std::endl;
+		std::cout << ">>> POPCNT : " << B[popcnt_supported] << std::endl;
+		std::cout << ">>> AVX    : " << B[avx_supported] << std::endl;
+		std::cout << ">>> AES    : " << B[aes_supported] << std::endl;
+		std::cout << ">>> 1<<29  : " << B[b29_supported] << std::endl;
+		std::cout << ">>> RDRAND : " << B[rdrand_supported] << std::endl;
+		std::cout << ">>> 1<<31  : " << B[b31_supported] << std::endl;
 	}
+
 
 	chunkSize = roundup(chunkSize, 2);
 	rngBuf = new BYTE[chunkSize];
 	
-	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS); 
+	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 	// warmup to turbo mode
 	runBenchmark<unsigned char>(dummy, "empty loop", NULL);
 
@@ -229,9 +240,12 @@ int main(int argc, char* argv[]) {
 	mt.seed(GetTickCount());
 	runBenchmark<unsigned int>(mt, "Mersenne-Twister", "mt.dat");
 
-	if (rdrand_supported) {
-		runBenchmark<unsigned short>(rdrand16, "_rdrand16_step", "mt.dat");
-		runBenchmark<unsigned int>(rdrand32, "_rdrand32_step", "mt.dat");
+	if (isGenuineIntelCPU() && rdrand_supported) {
+		runBenchmark<unsigned short>(rdrand16, "_rdrand16_step", "rdrand16.dat");
+		runBenchmark<unsigned int>(rdrand32, "_rdrand32_step", "rdrand32.dat");
+#if defined(_M_X64)
+		runBenchmark<unsigned __int64>(rdrand64, "_rdrand64_step", "rdrand64.dat");
+#endif
 	}
 
 	delete [] rngBuf;

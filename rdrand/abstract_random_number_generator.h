@@ -18,10 +18,10 @@ public:
 	virtual VariateType next(void) {return (*this)(); }
 	virtual void next(VariateType& dst) { dst = next(); }
 	virtual void seed(VariateType) { }
-	virtual const char* name(void) const { return "<invalid>"; }
 	virtual int size(void) const { return sizeof(VariateType); }
 	static VariateType makeSeed(void);
 };
+
 
 template <typename VariateType>
 VariateType AbstractRandomNumberGenerator<VariateType>::makeSeed(void)
@@ -40,7 +40,6 @@ VariateType AbstractRandomNumberGenerator<VariateType>::makeSeed(void)
 
 typedef AbstractRandomNumberGenerator<unsigned long long> UInt64RandomNumberGenerator;
 typedef AbstractRandomNumberGenerator<unsigned int> UIntRandomNumberGenerator;
-
 
 
 class DummyGenerator : public AbstractRandomNumberGenerator<unsigned char>
