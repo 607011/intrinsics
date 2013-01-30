@@ -17,6 +17,7 @@ public:
 	inline void next(unsigned short& r) {
 		_rdrand16_step(&r);
 	}
+	static const char* name(void) { return "rdrand16"; }
 };
 
 
@@ -32,6 +33,7 @@ public:
 	inline void next(unsigned int& r) {
 		_rdrand32_step(&r);
 	}
+	static const char* name(void) { return "rdrand32"; }
 };
 
 
@@ -48,5 +50,6 @@ public:
 	inline void next(unsigned __int64& r) {
 		_rdrand64_step(&r);
 	}
+	static const char* name(void) { return "rdrand64"; }
 };
 #endif

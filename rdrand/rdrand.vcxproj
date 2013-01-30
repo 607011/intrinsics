@@ -232,14 +232,17 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mersenne_twister.cpp" />
+    <ClCompile Include="util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="abstract_random_number_generator.h" />
+    <ClInclude Include="circ.h" />
     <ClInclude Include="marsaglia.h" />
     <ClInclude Include="mcg.h" />
     <ClInclude Include="mersenne_twister.h" />
     <ClInclude Include="rdrand.h" />
     <ClInclude Include="stopwatch.h" />
+    <ClInclude Include="util.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\getopt\getopt.vcxproj">

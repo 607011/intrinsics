@@ -5,21 +5,22 @@
 #include "abstract_random_number_generator.h"
 
 
-template <unsigned long long R0>
+template <unsigned __int64 R0>
 class MultiplicativeCongruential : public AbstractRandomNumberGenerator<unsigned char>
 {
 public:
-	MultiplicativeCongruential(unsigned long long _Seed = R0)
+	MultiplicativeCongruential(unsigned __int64 _Seed = R0)
 		: mR(_Seed)
 	{ }
 	unsigned char operator()() {
 		mR = (mR * 16807) & 0x7fffffffULL;
-		return (unsigned char) ((mR >> 11) & 0xff);
+		return (unsigned char) ((mR >> 11) & 0xffU);
 	}
-	inline void seed(unsigned long long _Seed) { mR = _Seed; }
+	inline void seed(unsigned __int64 _Seed) { mR = _Seed; }
+	static const char* name(void) { return "MCG"; }
 
 private:
-	unsigned long long mR;
+	unsigned __int64 mR;
 };
 
 typedef MultiplicativeCongruential<1> MCG;

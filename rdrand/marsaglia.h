@@ -28,6 +28,7 @@ public:
 	inline void seed(unsigned int _Seed) {
 		warmup(_Seed);
 	}
+	static const char* name(void) { return "Marsaglia"; }
 
 private:
 	inline void warmup(unsigned int s) {

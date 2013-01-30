@@ -4,9 +4,9 @@
 #pragma once
 
 #define _CRT_RAND_S
+#include <stdlib.h>
 #include <Windows.h>
 
-#include <limits>
 
 template <typename VariateType>
 class AbstractRandomNumberGenerator
@@ -20,6 +20,10 @@ public:
 	virtual void seed(VariateType) { }
 	virtual int size(void) const { return sizeof(VariateType); }
 	static VariateType makeSeed(void);
+	static const char* name(void) { return "<invalid>"; }
+	static int result_size(void) { return sizeof(VariateType); }
+
+	typedef VariateType result_t;
 };
 
 
@@ -28,17 +32,16 @@ VariateType AbstractRandomNumberGenerator<VariateType>::makeSeed(void)
 {
 	VariateType seed = 0;
 	if (hasRand_s()) {
-		seed = 0;
 		rand_s((unsigned int*)&seed);
 	}
 	else { 
-		seed = GetTickCount();
+		seed = (VariateType)GetTickCount();
 	}
 	return seed;
 }
 
 
-typedef AbstractRandomNumberGenerator<unsigned long long> UInt64RandomNumberGenerator;
+typedef AbstractRandomNumberGenerator<unsigned __int64> UInt64RandomNumberGenerator;
 typedef AbstractRandomNumberGenerator<unsigned int> UIntRandomNumberGenerator;
 
 
@@ -46,5 +49,6 @@ class DummyGenerator : public AbstractRandomNumberGenerator<unsigned char>
 {
 public:
 	DummyGenerator(void) { }
-	unsigned char operator()() { return 0; }
+	unsigned char operator()() { return 0x00U; }
+	static const char* name(void) { return "Dummy"; }
 };

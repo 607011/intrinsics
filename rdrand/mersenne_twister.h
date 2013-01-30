@@ -9,8 +9,8 @@ class MersenneTwister : public AbstractRandomNumberGenerator<unsigned int>
 public:
 	MersenneTwister(void) { /* ... */ }
 	unsigned int operator()();
-	inline unsigned int next(void) { return (*this)(); }
 	void seed(unsigned int _Seed = 9);
+	static const char* name(void) { return "Mersenne-Twister"; }
 
 private:
 	static const int N = 624;
