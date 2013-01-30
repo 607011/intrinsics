@@ -6,7 +6,7 @@
 #define _CRT_RAND_S
 #include <stdlib.h>
 #include <Windows.h>
-
+#include "util.h"
 
 template <typename VariateType>
 class AbstractRandomNumberGenerator
@@ -45,10 +45,19 @@ typedef AbstractRandomNumberGenerator<unsigned __int64> UInt64RandomNumberGenera
 typedef AbstractRandomNumberGenerator<unsigned int> UIntRandomNumberGenerator;
 
 
-class DummyGenerator : public AbstractRandomNumberGenerator<unsigned char>
+class DummyByteGenerator : public AbstractRandomNumberGenerator<unsigned char>
 {
 public:
-	DummyGenerator(void) { }
+	DummyByteGenerator(void) { }
 	unsigned char operator()() { return 0x00U; }
-	static const char* name(void) { return "Dummy"; }
+	static const char* name(void) { return "Dummy Byte"; }
+};
+
+
+class DummyIntGenerator : public AbstractRandomNumberGenerator<unsigned int>
+{
+public:
+	DummyIntGenerator(void) { }
+	unsigned int operator()() { return 0x00000000U; }
+	static const char* name(void) { return "Dummy Int"; }
 };
