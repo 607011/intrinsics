@@ -46,9 +46,10 @@ VariateType AbstractRandomNumberGenerator<VariateType>::makeSeed(void)
 
 typedef AbstractRandomNumberGenerator<unsigned __int64> UInt64RandomNumberGenerator;
 typedef AbstractRandomNumberGenerator<unsigned int> UIntRandomNumberGenerator;
+typedef AbstractRandomNumberGenerator<unsigned char> ByteRandomNumberGenerator;
 
 
-class DummyByteGenerator : public AbstractRandomNumberGenerator<unsigned char>
+class DummyByteGenerator : public ByteRandomNumberGenerator
 {
 public:
 	DummyByteGenerator(void) { }
@@ -57,7 +58,7 @@ public:
 };
 
 
-class DummyIntGenerator : public AbstractRandomNumberGenerator<unsigned int>
+class DummyIntGenerator : public UIntRandomNumberGenerator
 {
 public:
 	DummyIntGenerator(void) { }

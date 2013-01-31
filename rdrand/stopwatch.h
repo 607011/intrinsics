@@ -13,8 +13,6 @@ public:
 	{
 		mT = INVALID;
 		mTicks = INVALID;
-		mThreadPriority = GetThreadPriority(GetCurrentThread());
-		SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 		QueryPerformanceCounter(&mPC0);
 		mTicks0 = (__int64)__rdtsc();
 	}
@@ -29,7 +27,6 @@ public:
 		QueryPerformanceCounter(&pc);
 		QueryPerformanceFrequency(&freq);
 		mT = 1000 * (pc.QuadPart - mPC0.QuadPart) / freq.QuadPart;
-		SetThreadPriority(GetCurrentThread(), mThreadPriority);
 	}
 	static const __int64 INVALID = MINLONGLONG;
 
@@ -38,6 +35,5 @@ private:
 	__int64& mTicks;
 	LARGE_INTEGER mPC0;
 	__int64 mTicks0;
-	int mThreadPriority;
 };
 

@@ -5,7 +5,7 @@
 
 #include "abstract_random_number_generator.h"
 
-class MultiplyWithCarry : public AbstractRandomNumberGenerator<unsigned int>
+class MultiplyWithCarry : public UIntRandomNumberGenerator
 {
 public:
 	MultiplyWithCarry(unsigned int _Seed = 0x9908b0dfU) {

@@ -6,7 +6,7 @@
 
 
 template <unsigned __int64 R0>
-class MultiplicativeCongruential : public AbstractRandomNumberGenerator<unsigned char>
+class MultiplicativeCongruential : public ByteRandomNumberGenerator
 {
 public:
 	MultiplicativeCongruential(unsigned __int64 _Seed = R0)

@@ -4,7 +4,7 @@
 
 #include "abstract_random_number_generator.h"
 
-class MersenneTwister : public AbstractRandomNumberGenerator<unsigned int>
+class MersenneTwister : public UIntRandomNumberGenerator
 {
 public:
 	MersenneTwister(void) { /* ... */ }

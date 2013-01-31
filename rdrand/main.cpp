@@ -74,6 +74,7 @@ struct BenchmarkResult {
 };
 
 
+// die im Thread laufenden Benchmark-Routine
 template <class GEN>
 DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 {
@@ -83,15 +84,14 @@ DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 	GEN gen;
 	gen.seed(GEN::makeSeed());
-	GEN::result_t* rngBuf = new GEN::result_t[result->rngBufSize / GEN::result_size()];
-	result->rngBuf = (LPVOID)rngBuf;
 	__int64 tMin = MAXLONGLONG;
 	__int64 ticksMin = MAXLONGLONG;
+	// result->iterations Zufallszahlenblöcke generieren
 	for (int i = 0; i < result->iterations; ++i) {
 		__int64 t, ticks;
-		{
+		{ // einen Block Zufallszahlen generieren
 			Stopwatch stopwatch(t, ticks);
-			GEN::result_t* rn = (GEN::result_t*)rngBuf;
+			GEN::result_t* rn = (GEN::result_t*)result->rngBuf;
 			const GEN::result_t* rne = rn + result->rngBufSize / GEN::result_size();
 			while (rn < rne)
 				gen.next(*rn++);
@@ -120,6 +120,7 @@ void runBenchmark(const char* outputFilename, int numThreads) {
 		}
 	}
 
+	// Threads zum Leben erwecken
 	HANDLE* hThread = new HANDLE[numThreads];
 	BenchmarkResult* pResult = new BenchmarkResult[numThreads];
 	const DWORD numCores = getNumCores();
@@ -128,13 +129,15 @@ void runBenchmark(const char* outputFilename, int numThreads) {
 		pResult[i].rngBufSize = gRngBufSize;
 		pResult[i].iterations = gIterations;
 		pResult[i].numCores = numCores;
+		pResult[i].rngBuf = new GEN::result_t[gRngBufSize / GEN::result_size()];
 		pResult[i].hThread = CreateThread(NULL, 0, BenchmarkThreadProc<GEN>, (LPVOID)&pResult[i], CREATE_SUSPENDED, NULL);
-		hThread[i] = pResult[i].hThread; // hThread[] needed for WaitForMultipleObjects()
+		hThread[i] = pResult[i].hThread; // hThread[] wird von WaitForMultipleObjects() benötigt
 	}
 
 	std::cout.setf(std::ios_base::left, std::ios_base::adjustfield);
 	std::cout << "  " << std::setfill(' ') << std::setw(18) << GEN::name() << ' ';
 
+	// Threads starten, auf Ende warten, Zeit stoppen
 	__int64 t = MAXLONGLONG;
 	__int64 ticks = MAXLONGLONG;
 	{
@@ -144,9 +147,14 @@ void runBenchmark(const char* outputFilename, int numThreads) {
 		WaitForMultipleObjects(numThreads, hThread, TRUE, INFINITE);
 	}
 
-	if (fs.is_open() && pResult[0].rngBuf != NULL) {
-		std::cout << "writing ..." << std::flush << "\b\b\b\b\b\b\b\b\b\b\b";
-		fs.write((char*)pResult[0].rngBuf, gRngBufSize);
+	// ggf. Zufallszahlenbuffer in Datei schreiben
+	if (fs.is_open()) {
+		for (int i = 0; i < numThreads; ++i) {
+			if (pResult[i].rngBuf != NULL) {
+				std::cout << "writing ..." << std::flush << "\b\b\b\b\b\b\b\b\b\b\b";
+				fs.write((const char*)pResult[i].rngBuf, gRngBufSize);
+			}
+		}
 		fs.close();
 	}
 
@@ -282,6 +290,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	evaluateCPUFeatures();
+
 	if (gVerbose > 0)
 		std::cout << std::endl << "Generieren von " << gIterations << "x" << gRngBufSize << " MByte ..." << std::endl;
 	gRngBufSize *= 1024*1024;
@@ -292,17 +301,17 @@ int main(int argc, char* argv[]) {
 		const int numThreads = gNumThreads[i];
 		if (gVerbose > 0)
 			std::cout << std::endl << "... in " << numThreads << " Thread" << (numThreads == 1? "" : "s") << ":" << std::endl;
-		// warmup to turbo mode
+		// Aufwärmen für Turbo-Mode
 		runBenchmark<DummyByteGenerator>(NULL, numThreads);
 		runBenchmark<DummyIntGenerator>(NULL, numThreads);
 
-		// run software PRNG benchmarks
+		// software PRNG benchmarks
 		runBenchmark<CircularBytes>("circular.dat", numThreads);
 		runBenchmark<MultiplyWithCarry>("mwc.dat", numThreads);
 		runBenchmark<MCG>("mcg.dat", numThreads);
 		runBenchmark<MersenneTwister>("mt.dat", numThreads);
 
-		// run Ivy Bridge RNG benchmarks
+		// Ivy Bridge RNG benchmarks
 		if (isRdRandSupported()) {
 			runBenchmark<RdRand16>("rdrand16.dat", numThreads);
 			runBenchmark<RdRand32>("rdrand32.dat", numThreads);
