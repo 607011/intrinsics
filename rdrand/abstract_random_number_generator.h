@@ -12,15 +12,15 @@ template <typename VariateType>
 class AbstractRandomNumberGenerator
 {
 public:
-	AbstractRandomNumberGenerator(void) {}
-	virtual ~AbstractRandomNumberGenerator() {}
+	AbstractRandomNumberGenerator(void) { /* ... */ }
+	virtual ~AbstractRandomNumberGenerator() { /* ... */ }
 	virtual VariateType operator()(void) = 0;
 	virtual VariateType next(void) {return (*this)(); }
 	virtual void next(VariateType& dst) { dst = next(); }
-	virtual void seed(VariateType) { }
+	virtual void seed(VariateType) { /* ... */ }
 	virtual int size(void) const { return sizeof(VariateType); }
 	static VariateType makeSeed(void);
-	static const char* name(void) { return "<invalid>"; }
+	static const char* name(void) { return "Please overwrite AbstractRandomNumberGenerator::name() to provide a sensible name for your RNG!"; }
 	static int result_size(void) { return sizeof(VariateType); }
 
 	typedef VariateType result_t;
@@ -31,7 +31,10 @@ template <typename VariateType>
 VariateType AbstractRandomNumberGenerator<VariateType>::makeSeed(void)
 {
 	VariateType seed = 0;
-	if (hasRand_s()) {
+	if (isRdRandSupported()) {
+		seed = (VariateType)getRdRand32();
+	}
+	else if (hasRand_s()) {
 		rand_s((unsigned int*)&seed);
 	}
 	else { 
