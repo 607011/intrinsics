@@ -17,6 +17,7 @@ public:
 		return (unsigned char) ((mR >> 11) & 0xffU);
 	}
 	inline void seed(unsigned __int64 _Seed) { mR = _Seed; }
+	inline void seed(void) { seed(makeSeed()); }
 	static const char* name(void) { return "MCG"; }
 
 private:

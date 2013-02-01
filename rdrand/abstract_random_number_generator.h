@@ -8,37 +8,37 @@
 #include <Windows.h>
 #include "util.h"
 
-template <typename VariateType>
+template <typename T>
 class AbstractRandomNumberGenerator
 {
 public:
 	AbstractRandomNumberGenerator(void) { /* ... */ }
 	virtual ~AbstractRandomNumberGenerator() { /* ... */ }
-	virtual VariateType operator()(void) = 0;
-	virtual VariateType next(void) {return (*this)(); }
-	virtual void next(VariateType& dst) { dst = next(); }
-	virtual void seed(VariateType) { /* ... */ }
-	virtual int size(void) const { return sizeof(VariateType); }
-	static VariateType makeSeed(void);
+	virtual T operator()(void) = 0;
+	virtual T next(void) {return (*this)(); }
+	virtual void next(T& dst) { dst = next(); }
+	virtual void seed(T) { /* ... */ }
+	virtual void seed(void) { seed(makeSeed()); }
+	static T makeSeed(void);
 	static const char* name(void) { return "Please overwrite AbstractRandomNumberGenerator::name() to provide a sensible name for your RNG!"; }
-	static int result_size(void) { return sizeof(VariateType); }
+	static int result_size(void) { return sizeof(T); }
 
-	typedef VariateType result_t;
+	typedef T result_t;
 };
 
 
-template <typename VariateType>
-VariateType AbstractRandomNumberGenerator<VariateType>::makeSeed(void)
+template <typename T>
+T AbstractRandomNumberGenerator<T>::makeSeed(void)
 {
-	VariateType seed = 0;
+	T seed = 0;
 	if (isRdRandSupported()) {
-		seed = (VariateType)getRdRand32();
+		seed = (T)getRdRand32();
 	}
 	else if (hasRand_s()) {
 		rand_s((unsigned int*)&seed);
 	}
 	else { 
-		seed = (VariateType)GetTickCount();
+		seed = (T)GetTickCount();
 	}
 	return seed;
 }
@@ -58,10 +58,10 @@ public:
 };
 
 
-class DummyIntGenerator : public UIntRandomNumberGenerator
+class DummyUIntGenerator : public UIntRandomNumberGenerator
 {
 public:
-	DummyIntGenerator(void) { }
+	DummyUIntGenerator(void) { }
 	unsigned int operator()() { return 0x00000000U; }
 	static const char* name(void) { return "Dummy Int"; }
 };

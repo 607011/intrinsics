@@ -25,9 +25,8 @@ public:
 		mR[0] = (unsigned int)(sum & 0xffffffffULL);
 		return mR[0];
 	}
-	inline void seed(unsigned int _Seed) {
-		warmup(_Seed);
-	}
+	inline void seed(unsigned int _Seed) { warmup(_Seed); }
+	inline void seed(void) { seed(makeSeed()); }
 	static const char* name(void) { return "Marsaglia"; }
 
 private:

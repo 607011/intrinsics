@@ -14,6 +14,7 @@ public:
 	{ }
 	T operator()() { return mR++ % mM; }
 	inline void seed(T _Seed) { mR = _Seed; }
+	inline void seed(void) { seed(makeSeed()); }
 	static const char* name(void) { return "CircularBytes"; }
 
 private:

@@ -9,7 +9,8 @@ class MersenneTwister : public UIntRandomNumberGenerator
 public:
 	MersenneTwister(void) { /* ... */ }
 	unsigned int operator()();
-	void seed(unsigned int _Seed = 9);
+	void seed(unsigned int);
+	inline void seed(void) { seed(makeSeed()); }
 	static const char* name(void) { return "Mersenne-Twister"; }
 
 private:

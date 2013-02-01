@@ -83,7 +83,7 @@ DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 		SetThreadAffinityMask(GetCurrentThread(), 1<<(result->num % result->numCores));
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 	GEN gen;
-	gen.seed(GEN::makeSeed());
+	gen.seed();
 	__int64 tMin = MAXLONGLONG;
 	__int64 ticksMin = MAXLONGLONG;
 	// result->iterations Zufallszahlenblöcke generieren
@@ -135,8 +135,8 @@ void runBenchmark(const char* outputFilename, int numThreads) {
 	}
 
 	std::cout.setf(std::ios_base::left, std::ios_base::adjustfield);
-	std::cout << "  " << std::setfill(' ') << std::setw(18) << GEN::name() << ' ';
-
+	std::cout << "  " << std::setfill(' ') << std::setw(18) << GEN::name()
+		<< " Generieren ..." << std::flush;
 	// Threads starten, auf Ende warten, Zeit stoppen
 	__int64 t = MAXLONGLONG;
 	__int64 ticks = MAXLONGLONG;
@@ -146,14 +146,15 @@ void runBenchmark(const char* outputFilename, int numThreads) {
 			ResumeThread(hThread[i]);
 		WaitForMultipleObjects(numThreads, hThread, TRUE, INFINITE);
 	}
+	std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
 
 	// ggf. Zufallszahlenbuffer in Datei schreiben
 	if (fs.is_open()) {
 		for (int i = 0; i < numThreads; ++i) {
-			if (pResult[i].rngBuf != NULL) {
-				std::cout << "writing ..." << std::flush << "\b\b\b\b\b\b\b\b\b\b\b";
+			std::cout << "Schreiben ..." << std::flush;
+			if (pResult[i].rngBuf != NULL)
 				fs.write((const char*)pResult[i].rngBuf, gRngBufSize);
-			}
+			std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b";
 		}
 		fs.close();
 	}
@@ -303,7 +304,7 @@ int main(int argc, char* argv[]) {
 			std::cout << std::endl << "... in " << numThreads << " Thread" << (numThreads == 1? "" : "s") << ":" << std::endl;
 		// Aufwärmen für Turbo-Mode
 		runBenchmark<DummyByteGenerator>(NULL, numThreads);
-		runBenchmark<DummyIntGenerator>(NULL, numThreads);
+		runBenchmark<DummyUIntGenerator>(NULL, numThreads);
 
 		// software PRNG benchmarks
 		runBenchmark<CircularBytes>("circular.dat", numThreads);
