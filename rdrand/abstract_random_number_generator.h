@@ -12,7 +12,10 @@ template <typename T>
 class AbstractRandomNumberGenerator
 {
 public:
-	AbstractRandomNumberGenerator(void) { /* ... */ }
+	AbstractRandomNumberGenerator(void)
+		: mInvalid(0)
+		, mLimitExceeded(0) 
+	{ /* ... */ }
 	virtual ~AbstractRandomNumberGenerator() { /* ... */ }
 	virtual T operator()(void) = 0;
 	virtual T next(void) {return (*this)(); }
@@ -24,6 +27,15 @@ public:
 	static int result_size(void) { return sizeof(T); }
 
 	typedef T result_t;
+
+	unsigned __int64 invalid(void) const { return mInvalid; }
+	unsigned __int64 limitExceeded(void) const { return mLimitExceeded; }
+
+	static const int RETRY_LIMIT = 10;
+
+protected:
+	unsigned __int64 mInvalid;
+	unsigned __int64 mLimitExceeded;
 };
 
 

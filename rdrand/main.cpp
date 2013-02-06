@@ -31,11 +31,12 @@ int gThreadPriority;
 bool gBindToCore = true;
 bool gDoAppend = false;
 bool gDoWrite = true;
-
+bool gDoWriteToMemory = true;
 
 enum _long_options {
 	SELECT_HELP = 0x1,
 	SELECT_NO_WRITE,
+	SELECT_NO_WRITE_TO_MEM,
 	SELECT_NO_BIND_TO_CORE,
 	SELECT_ITERATIONS,
 	SELECT_THREADS,
@@ -43,6 +44,7 @@ enum _long_options {
 static struct option long_options[] = {
 	{ "append",               no_argument,       0, SELECT_APPEND },
 	{ "no-write",             no_argument,       0, SELECT_NO_WRITE },
+	{ "no-write-to-memory",   no_argument,       0, SELECT_NO_WRITE_TO_MEM },
 	{ "no-bind-to-core",      no_argument,       0, SELECT_NO_BIND_TO_CORE },
 	{ "iterations",           required_argument, 0, SELECT_ITERATIONS },
 	{ "threads",              required_argument, 0, SELECT_THREADS },
@@ -60,17 +62,22 @@ struct BenchmarkResult {
 	~BenchmarkResult() {
 		if (hThread)
 			CloseHandle(hThread);
-		if (rngBuf)
+		if (rngBuf != NULL)
 			delete [] rngBuf;
 	}
-	__int64 t;
-	__int64 ticks;
+	// input fields
+	bool writeToMemory;
 	LPVOID rngBuf;
+	int rngBufSize;
 	int num;
 	HANDLE hThread;
-	int rngBufSize;
 	int iterations;
 	DWORD numCores;
+	// output fields
+	__int64 t;
+	__int64 ticks;
+	unsigned __int64 exceeded;
+	unsigned __int64 invalid;
 };
 
 
@@ -89,17 +96,25 @@ DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 	// result->iterations Zufallszahlenblöcke generieren
 	for (int i = 0; i < result->iterations; ++i) {
 		__int64 t, ticks;
-		{ // einen Block Zufallszahlen generieren
+		if (result->writeToMemory) { // einen Block Zufallszahlen generieren
 			Stopwatch stopwatch(t, ticks);
 			GEN::result_t* rn = (GEN::result_t*)result->rngBuf;
 			const GEN::result_t* rne = rn + result->rngBufSize / GEN::result_size();
 			while (rn < rne)
 				gen.next(*rn++);
 		}
+		else {
+			Stopwatch stopwatch(t, ticks);
+			int i = result->rngBufSize / GEN::result_size();
+			while (--i)
+				gen();
+		}
 		if (t < tMin)
 			tMin = t;
 		if (ticks < ticksMin)
 			ticksMin = ticks;
+		result->invalid = gen.invalid();
+		result->exceeded = gen.limitExceeded();
 	}
 	result->t = tMin;
 	result->ticks = ticksMin;
@@ -108,7 +123,7 @@ DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 
 
 template <class GEN>
-void runBenchmark(const char* outputFilename, int numThreads) {
+void runBenchmark(const char* outputFilename, const int numThreads) {
 	std::ofstream fs;
 	if (outputFilename != NULL && gDoWrite) {
 		fs.open(outputFilename, gDoAppend
@@ -129,15 +144,21 @@ void runBenchmark(const char* outputFilename, int numThreads) {
 		pResult[i].rngBufSize = gRngBufSize;
 		pResult[i].iterations = gIterations;
 		pResult[i].numCores = numCores;
-		pResult[i].rngBuf = new GEN::result_t[gRngBufSize / GEN::result_size()];
+		pResult[i].rngBuf = gDoWriteToMemory? new GEN::result_t[gRngBufSize / GEN::result_size()] : NULL;
 		pResult[i].hThread = CreateThread(NULL, 0, BenchmarkThreadProc<GEN>, (LPVOID)&pResult[i], CREATE_SUSPENDED, NULL);
+		pResult[i].writeToMemory = gDoWriteToMemory;
 		hThread[i] = pResult[i].hThread; // hThread[] wird von WaitForMultipleObjects() benötigt
 	}
 
 	std::cout.setf(std::ios_base::left, std::ios_base::adjustfield);
-	std::cout << "  " << std::setfill(' ') << std::setw(18) << GEN::name()
-		<< " Generieren ..." << std::flush;
+		std::cout << "  " << std::setfill(' ') << std::setw(18) << GEN::name() << " ";
 	// Threads starten, auf Ende warten, Zeit stoppen
+	std::cout << "Warm-up ..." << std::flush;
+	volatile __int64 dummy = 0;
+	for (__int64 i = 0; i < 1700000000LL; ++i)
+		++dummy;
+	std::cout << "\b\b\b\b\b\b\b\b\b\b\b" 
+		<< "Generieren ..." << std::flush;
 	__int64 t = MAXLONGLONG;
 	__int64 ticks = MAXLONGLONG;
 	{
@@ -159,15 +180,24 @@ void runBenchmark(const char* outputFilename, int numThreads) {
 		fs.close();
 	}
 
+	// Ergebnisse sammeln
 	__int64 tMin = 0;
-	for (int i = 0; i < numThreads; ++i)
+	__int64 invalidSum = 0;
+	__int64 exceededSum = 0;
+	for (int i = 0; i < numThreads; ++i) {
 		tMin += pResult[i].t;
+		invalidSum += pResult[i].invalid;
+		exceededSum += pResult[i].exceeded;
+	}
 	tMin /= numThreads;
 
 	std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
 	std::cout << std::setfill(' ') << std::setw(5) << tMin << " ms, " 
-		<< std::fixed << std::setw(8) << std::setprecision(2) << (float)gRngBufSize*gIterations/1024/1024/(1e-3*t)*numThreads << " Mbyte/s"
-		<< std::endl;
+		<< std::fixed << std::setw(8) << std::setprecision(2) << (float)gRngBufSize*gIterations/1024/1024/(1e-3*t)*numThreads << " MByte/s";
+
+	if (invalidSum > 0)
+		std::cout << "(invalid: " << invalidSum << ", exceeded: " << exceededSum << ")";
+	std::cout << std::endl;
 
 	delete [] pResult;
 	delete [] hThread;
@@ -175,7 +205,7 @@ void runBenchmark(const char* outputFilename, int numThreads) {
 
 
 void usage(void) {
-	std::cout << "Aufruf: intrinsics [Optionen]" << std::endl
+	std::cout << "Aufruf: rdrand.exe [Optionen]" << std::endl
 		<< std::endl
 		<< "Optionen:" << std::endl
 		<< "  -n N" << std::endl
@@ -190,6 +220,10 @@ void usage(void) {
 		<< std::endl
 		<< "  --no-write" << std::endl
 		<< "     Zufallszahlen nur erzeugen, nicht in Datei schreiben" << std::endl
+		<< std::endl
+		<< "  --no-write-to-memory" << std::endl
+		<< "     Zufallszahlen nur erzeugen, nicht in Speicher ablegen" << std::endl
+		<< "     (impliziert --no-write)" << std::endl
 		<< std::endl
 		<< "  --quiet" << std::endl
 		<< "  -q" << std::endl
@@ -209,7 +243,7 @@ void usage(void) {
 
 
 void disclaimer(void) {
-	std::cout << "intrinsics - Experimente mit (Pseudo-)Zufallszahlengeneratoren." << std::endl
+	std::cout << "rdrand - Experimente mit (Pseudo-)Zufallszahlengeneratoren." << std::endl
 		<< "Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag" << std::endl
 		<< "Alle Rechte vorbehalten." << std::endl
 		<< std::endl
@@ -248,6 +282,9 @@ int main(int argc, char* argv[]) {
 			gRngBufSize = atoi(optarg);
 			if (gRngBufSize <= 0)
 				gRngBufSize = DEFAULT_RNGBUF_SIZE;
+			break;
+		case SELECT_NO_WRITE_TO_MEM:
+			gDoWriteToMemory = false;
 			break;
 		case SELECT_THREADS:
 			// fall-through
@@ -290,6 +327,9 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	if (!gDoWriteToMemory)
+		gDoWrite = false;
+
 	evaluateCPUFeatures();
 
 	if (gVerbose > 0)
@@ -302,12 +342,12 @@ int main(int argc, char* argv[]) {
 		const int numThreads = gNumThreads[i];
 		if (gVerbose > 0)
 			std::cout << std::endl << "... in " << numThreads << " Thread" << (numThreads == 1? "" : "s") << ":" << std::endl;
-		// Aufwärmen für Turbo-Mode
+
 		runBenchmark<DummyByteGenerator>(NULL, numThreads);
-		runBenchmark<DummyUIntGenerator>(NULL, numThreads);
+		// runBenchmark<DummyUIntGenerator>(NULL, numThreads);
 
 		// software PRNG benchmarks
-		runBenchmark<CircularBytes>("circular.dat", numThreads);
+		// runBenchmark<CircularBytes>("circular.dat", numThreads);
 		runBenchmark<MultiplyWithCarry>("mwc.dat", numThreads);
 		runBenchmark<MCG>("mcg.dat", numThreads);
 		runBenchmark<MersenneTwister>("mt.dat", numThreads);
@@ -320,6 +360,7 @@ int main(int argc, char* argv[]) {
 			runBenchmark<RdRand64>("rdrand64.dat", numThreads);
 #endif
 		}
+
 	}
 
 	return EXIT_SUCCESS;

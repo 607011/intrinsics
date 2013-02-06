@@ -72,7 +72,7 @@ void evaluateCPUFeatures(void) {
 	bool rdrand_supported = (cpureg[2] & (1<<30)) != 0;
 	bool b31_supported =    (cpureg[2] & (1<<31)) != 0;
 	if (gVerbose > 1) {
-		std::cout << ">>> #cores : " << getNumCores() << std::endl;
+		std::cout << ">>> #Cores : " << getNumCores() << std::endl;
 		std::cout << ">>> SSE3   : " << B[sse3_supported] << std::endl;
 		std::cout << ">>> SSE4.1 : " << B[sse41_supported] << std::endl;
 		std::cout << ">>> SSE4.2 : " << B[sse42_supported] << std::endl;

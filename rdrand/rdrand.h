@@ -5,6 +5,7 @@
 #include <immintrin.h>
 #include "abstract_random_number_generator.h"
 
+
 class RdRand16 : public AbstractRandomNumberGenerator<unsigned __int16>
 {
 public:
@@ -15,7 +16,14 @@ public:
 		return x;
 	}
 	inline void next(unsigned short& r) {
-		_rdrand16_step(&r);
+		int tries = RETRY_LIMIT;
+		do {
+			if (_rdrand16_step(&r))
+				return;
+			++mInvalid;
+		}
+		while (tries--);
+		++mLimitExceeded;
 	}
 	static const char* name(void) { return "rdrand16"; }
 };
@@ -31,7 +39,14 @@ public:
 		return x;
 	}
 	inline void next(unsigned int& r) {
-		_rdrand32_step(&r);
+		int tries = RETRY_LIMIT;
+		do {
+			if (_rdrand32_step(&r)) 
+				return;
+			++mInvalid;
+		}
+		while (tries--);
+		++mLimitExceeded;
 	}
 	static const char* name(void) { return "rdrand32"; }
 };
@@ -41,14 +56,21 @@ public:
 class RdRand64 : public AbstractRandomNumberGenerator<unsigned __int64>
 {
 public:
-	RdRand64(void) { }
+	RdRand64(void) { /* ... */ }
 	inline unsigned __int64 operator()() {
 		unsigned __int64 x;
 		_rdrand64_step(&x);
 		return x;
 	}
 	inline void next(unsigned __int64& r) {
-		_rdrand64_step(&r);
+		int tries = RETRY_LIMIT;
+		do {
+			if (_rdrand64_step(&r))
+				return;
+			++mInvalid;
+		}
+		while (tries--);
+		++mLimitExceeded;
 	}
 	static const char* name(void) { return "rdrand64"; }
 };
