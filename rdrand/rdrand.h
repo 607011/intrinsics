@@ -2,6 +2,7 @@
 
 #pragma once
 
+
 #include <immintrin.h>
 #include "abstract_random_number_generator.h"
 

@@ -18,36 +18,9 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="mersenne_twister.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="util.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stopwatch.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="mersenne_twister.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="marsaglia.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="mcg.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="abstract_random_number_generator.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="rdrand.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="circ.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

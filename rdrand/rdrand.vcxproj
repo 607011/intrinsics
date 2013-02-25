@@ -96,7 +96,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\boost_1_48_0;C:\Program Files\Microsoft SDKs\Windows\v7.0A\Include;C:\pthreads-2.8.0\include;D:\WINDDK\7600.16385.0\inc\ddk;D:\WINDDK\7600.16385.0\inc\api;$(IncludePath);$(SolutionDir)\getopt</IncludePath>
+    <IncludePath>C:\boost_1_48_0;C:\Program Files\Microsoft SDKs\Windows\v7.0A\Include;C:\pthreads-2.8.0\include;D:\WINDDK\7600.16385.0\inc\ddk;D:\WINDDK\7600.16385.0\inc\api;$(IncludePath);$(SolutionDir)\getopt;$(SolutionDir)\rng</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -104,7 +104,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\boost_1_48_0;C:\Program Files\Microsoft SDKs\Windows\v7.0A\Include;C:\pthreads-2.8.0\include;D:\WINDDK\7600.16385.0\inc\ddk;D:\WINDDK\7600.16385.0\inc\api;$(IncludePath);$(SolutionDir)\getopt</IncludePath>
+    <IncludePath>$(IncludePath);$(SolutionDir)\sharedutil;$(SolutionDir)\getopt;$(SolutionDir)\rng</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -112,7 +112,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release 64 Bit|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\boost_1_48_0;C:\Program Files\Microsoft SDKs\Windows\v7.0A\Include;C:\pthreads-2.8.0\include;D:\WINDDK\7600.16385.0\inc\ddk;D:\WINDDK\7600.16385.0\inc\api;$(IncludePath);$(SolutionDir)\getopt</IncludePath>
+    <IncludePath>C:\boost_1_48_0;C:\Program Files\Microsoft SDKs\Windows\v7.0A\Include;C:\pthreads-2.8.0\include;D:\WINDDK\7600.16385.0\inc\ddk;D:\WINDDK\7600.16385.0\inc\api;$(IncludePath);$(SolutionDir)\getopt;$(SolutionDir)\sharedutil;$(SolutionDir)\rng</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release 64 Bit|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -159,13 +159,15 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <IgnoreSpecificDefaultLibraries>LIBCMT.lib</IgnoreSpecificDefaultLibraries>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
     </Link>
     <PostBuildEvent>
       <Command>copy $(TargetDir)$(TargetFileName) "P:\rdrand\32 Bit\rdrand.exe"</Command>
@@ -180,13 +182,15 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <IgnoreSpecificDefaultLibraries>LIBCMT.lib</IgnoreSpecificDefaultLibraries>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
     </Link>
     <PostBuildEvent>
       <Command>copy $(TargetDir)$(TargetFileName) "P:\rdrand\64 Bit\rdrand-64.exe"</Command>
@@ -231,22 +235,19 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="mersenne_twister.cpp" />
-    <ClCompile Include="util.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="abstract_random_number_generator.h" />
-    <ClInclude Include="circ.h" />
-    <ClInclude Include="marsaglia.h" />
-    <ClInclude Include="mcg.h" />
-    <ClInclude Include="mersenne_twister.h" />
     <ClInclude Include="rdrand.h" />
-    <ClInclude Include="stopwatch.h" />
-    <ClInclude Include="util.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\getopt\getopt.vcxproj">
       <Project>{fb10a353-c026-45e9-bc20-1fc81b036c03}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\rng\rng.vcxproj">
+      <Project>{601d70ac-2050-4e38-a10c-b4f69298d5ba}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\sharedutil\sharedutil.vcxproj">
+      <Project>{eaea0657-2b19-4a1b-bdb0-7be7e3c64349}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

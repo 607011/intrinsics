@@ -3,10 +3,9 @@
 
 #pragma once
 
-#define _CRT_RAND_S
 #include <stdlib.h>
 #include <Windows.h>
-#include "util.h"
+#include <util.h>
 
 template <typename T>
 class AbstractRandomNumberGenerator
@@ -45,9 +44,6 @@ T AbstractRandomNumberGenerator<T>::makeSeed(void)
 	T seed = 0;
 	if (isRdRandSupported()) {
 		seed = (T)getRdRand32();
-	}
-	else if (hasRand_s()) {
-		rand_s((unsigned int*)&seed);
 	}
 	else { 
 		seed = (T)GetTickCount();

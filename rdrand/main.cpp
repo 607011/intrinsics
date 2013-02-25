@@ -1,21 +1,21 @@
 // Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
 
-#define _CRT_RAND_S
 
 #include <Windows.h>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
-#include <getopt.h>
 
-#include "stopwatch.h"
-#include "abstract_random_number_generator.h"
-#include "mersenne_twister.h"
-#include "marsaglia.h"
-#include "mcg.h"
-#include "circ.h"
+#include <getopt.h>
+#include <stopwatch.h>
+#include <util.h>
+#include <abstract_random_number_generator.h>
+#include <mersenne_twister.h>
+#include <marsaglia.h>
+#include <mcg.h>
+#include <circ.h>
+
 #include "rdrand.h"
-#include "util.h"
 
 static const int DEFAULT_ITERATIONS = 12;
 static const int DEFAULT_RNGBUF_SIZE = 256;
@@ -26,7 +26,6 @@ int gIterations = DEFAULT_ITERATIONS;
 int gRngBufSize = DEFAULT_RNGBUF_SIZE;
 int gNumThreads[MAX_NUM_THREADS] = { DEFAULT_NUM_THREADS };
 int gThreadIterations = 0;
-int gVerbose = 0;
 int gThreadPriority;
 bool gBindToCore = true;
 bool gDoAppend = false;
