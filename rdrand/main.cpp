@@ -9,7 +9,6 @@
 #include <getopt.h>
 #include <stopwatch.h>
 #include <util.h>
-#include <abstract_random_number_generator.h>
 #include <mersenne_twister.h>
 #include <marsaglia.h>
 #include <mcg.h>
