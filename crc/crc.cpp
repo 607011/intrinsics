@@ -26,9 +26,9 @@ int gThreadPriority;
 bool gBindToCore = true;
 
 struct CrcResult {
-	int nThreads;
-	std::string method;
-	unsigned int crc;
+	const int nThreads;
+	const std::string method;
+	const unsigned int crc;
 };
 
 std::vector<CrcResult> gCrcResults;
@@ -306,7 +306,7 @@ int main(int argc, char* argv[]) {
 		return EXIT_FAILURE;
 	}
 	unsigned int* rn = gRngBuf;
-	const unsigned int* rne = rn + gMaxNumThreads * gRngBufSize / sizeof(unsigned int);
+	const unsigned int* const rne = rn + gMaxNumThreads * gRngBufSize / sizeof(unsigned int);
 	while (rn < rne)
 		gen.next(*rn++);
 
@@ -323,7 +323,7 @@ int main(int argc, char* argv[]) {
 	if (gVerbose > 1) 
 		std::cout << std::endl;
 	bool correct = true;
-	unsigned int crc = gCrcResults.cbegin()->crc;
+	const unsigned int crc = gCrcResults.cbegin()->crc;
 	for (std::vector<CrcResult>::const_iterator i = gCrcResults.cbegin(); i != gCrcResults.cend() && correct; ++i) {
 		correct = (i->crc == crc);
 		if (gVerbose > 1)
