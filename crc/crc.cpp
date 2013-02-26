@@ -48,7 +48,12 @@ static struct option long_options[] = {
 
 
 enum Method {
+	Intrinsic8,
+	Intrinsic16,
 	Intrinsic32,
+#if defined(_M_X64)
+	Intrinsic64,
+#endif
 	Boost
 };
 
@@ -89,23 +94,56 @@ DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 	__int64 tMin = MAXLONGLONG;
 	__int64 ticksMin = MAXLONGLONG;
 	unsigned int crc;
+#if defined(_M_X64)
+	unsigned __int64 crc64;
+#endif
 	for (int i = 0; i < result->iterations; ++i) {
 		__int64 t, ticks;
 		crc = 0x00000000U;
+#if defined(_M_X64)
+		crc64 = 0;
+#endif
 		{
 			Stopwatch stopwatch(t, ticks);
-			unsigned int* rn = result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned int);
-			switch (result->method) 
+			switch (result->method)
 			{
+			case Intrinsic8:
+				{
+					unsigned char* rn = (unsigned char*)result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned char);
+					const unsigned char* const rne = (unsigned char*)rn + result->rngBufSize / sizeof(unsigned char);
+					while (rn < rne)
+						crc = _mm_crc32_u8(crc, *rn++);
+					break;
+				}
+			case Intrinsic16:
+				{
+					unsigned short* rn = (unsigned short*)result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned short);
+					const unsigned short* const rne = (unsigned short*)rn + result->rngBufSize / sizeof(unsigned short);
+					while (rn < rne)
+						crc = _mm_crc32_u16(crc, *rn++);
+					break;
+				}
 			case Intrinsic32:
 				{
-					const unsigned int* rne = rn + result->rngBufSize / sizeof(unsigned int);
+					unsigned int* rn = result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned int);
+					const unsigned int* const rne = rn + result->rngBufSize / sizeof(unsigned int);
 					while (rn < rne)
 						crc = _mm_crc32_u32(crc, *rn++);
 					break;
 				}
+#if defined(_M_X64)
+			case Intrinsic64:
+				{
+					unsigned __int64* rn = (unsigned __int64*)result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned __int64);
+					const unsigned __int64* const rne = rn + result->rngBufSize / sizeof(unsigned __int64);
+					while (rn < rne)
+						crc64 = _mm_crc32_u64(crc64, *rn++);
+					break;
+				}
+#endif
 			case Boost:
 				{
+					unsigned int* rn = result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned int);
 					boost::crc_optimal<32, 0x1EDC6F41 , 0, 0, true, true> crcResult;
 					crcResult.process_bytes(rn, result->rngBufSize);
 					crc = crcResult.checksum();
@@ -120,7 +158,7 @@ DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 	}
 	result->t = tMin;
 	result->ticks = ticksMin;
-	result->crc = crc;
+	result->crc = (result->method == Intrinsic64)? (unsigned int)(crc64 & 0xffffffffU) : crc;
 	return EXIT_SUCCESS;
 }
 
@@ -316,7 +354,12 @@ int main(int argc, char* argv[]) {
 		const int numThreads = gNumThreads[i];
 		if (gVerbose > 0)
 			std::cout << std::endl << "... in " << numThreads << " Thread" << (numThreads == 1? "" : "s") << ":" << std::endl;
+		runBenchmark(numThreads, "_mm_crc32_u8", Intrinsic8);
+		runBenchmark(numThreads, "_mm_crc32_u16", Intrinsic16);
 		runBenchmark(numThreads, "_mm_crc32_u32", Intrinsic32);
+#if defined(_M_X64)
+		runBenchmark(numThreads, "_mm_crc32_u64", Intrinsic64);
+#endif
 		runBenchmark(numThreads, "boost::crc",    Boost);
 	}
 
