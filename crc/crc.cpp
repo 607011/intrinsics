@@ -3,7 +3,8 @@
 #include <Windows.h>
 #include <iostream>
 #include <iomanip>
-
+#include <vector>
+#include <string>
 #include <util.h>
 #include <getopt.h>
 #include <mersenne_twister.h>
@@ -23,6 +24,14 @@ int gMaxNumThreads = 1;
 int gThreadIterations = 0;
 int gThreadPriority;
 bool gBindToCore = true;
+
+struct CrcResult {
+	int nThreads;
+	std::string method;
+	unsigned int crc;
+};
+
+std::vector<CrcResult> gCrcResults;
 
 enum _long_options {
 	SELECT_HELP = 0x1,
@@ -134,7 +143,7 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
 		hThread[i] = pResult[i].hThread; // hThread[] wird von WaitForMultipleObjects() benötigt
 	}
 	std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
-	std::cout << "Calculating CRC ...";
+	std::cout << "Berechnen des CRC ...";
 
 	__int64 t = MAXLONGLONG;
 	__int64 ticks = MAXLONGLONG;
@@ -144,11 +153,13 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
 			ResumeThread(hThread[i]);
 		WaitForMultipleObjects(numThreads, hThread, TRUE, INFINITE);
 	}
-	std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
+	std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
 
 	// Ergebnisse sammeln
-	__int64 tMin = 0;
-	for (int i = 0; i < numThreads; ++i)
+	CrcResult result = { numThreads, strMethod, pResult[0].crc };
+	gCrcResults.push_back(result);
+	__int64 tMin = pResult[0].t;
+	for (int i = 1; i < numThreads; ++i)
 		tMin += pResult[i].t;
 	tMin /= numThreads;
 
@@ -205,7 +216,7 @@ void disclaimer(void) {
 
 int main(int argc, char* argv[]) {
 	if (!isCRCSupported()) {
-		std::cerr << "ERROR: CRC not supported." << std::endl;
+		std::cerr << "FEHLER: Dieser Computer unterstützt die CRC-Instruktion leider nicht!" << std::endl;
 		return EXIT_FAILURE;
 	}
 	gThreadPriority = GetThreadPriority(GetCurrentThread());
@@ -280,18 +291,18 @@ int main(int argc, char* argv[]) {
 	MersenneTwister gen;
 	gen.seed();
 	if (gVerbose > 0)
-		std::cout << std::endl << "Generating " << gMaxNumThreads << "x" << gRngBufSize << " MByte ..." << std::endl;
+		std::cout << std::endl << "Generieren von " << gMaxNumThreads << "x" << gRngBufSize << " MByte ..." << std::endl;
 	gRngBufSize *= 1024*1024;
 	try {
 		gRngBuf = new unsigned int[gMaxNumThreads * gRngBufSize / sizeof(unsigned int)];
 	}
 	catch(...)
 	{
-		std::cerr << "ERROR: not enough memory." << std::endl;
+		std::cerr << "FEHLER: nicht genug freier Speicher!" << std::endl;
 		return EXIT_FAILURE;
 	}
 	if (gRngBuf == NULL) {
-		std::cerr << "ERROR: cannot allocate memory." << std::endl;
+		std::cerr << "FEHLER beim Allozieren des Speichers!" << std::endl;
 		return EXIT_FAILURE;
 	}
 	unsigned int* rn = gRngBuf;
@@ -300,7 +311,7 @@ int main(int argc, char* argv[]) {
 		gen.next(*rn++);
 
 	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
-	std::cout << "Checksumming (" << gIterations << " iterations) ..." << std::endl;
+	std::cout << "Bilden der Prüfsummen (" << gIterations << "x" << (gRngBufSize/1024/1024) << " MByte) ..." << std::endl;
 	for (int i = 0; i <= gThreadIterations && gNumThreads[i] > 0 ; ++i) {
 		const int numThreads = gNumThreads[i];
 		if (gVerbose > 0)
@@ -309,7 +320,27 @@ int main(int argc, char* argv[]) {
 		runBenchmark(numThreads, "boost::crc",    Boost);
 	}
 
+	if (gVerbose > 1) 
+		std::cout << std::endl;
+	bool correct = true;
+	unsigned int crc = gCrcResults.cbegin()->crc;
+	for (std::vector<CrcResult>::const_iterator i = gCrcResults.cbegin(); i != gCrcResults.cend() && correct; ++i) {
+		correct = (i->crc == crc);
+		if (gVerbose > 1)
+			std::cout << "Prüfen des Ergebnisses von Methode '" << i->method
+				<< "' in " << i->nThreads << " Threads ..."
+				<< ((correct)? "OK" : "FEHLER") << std::endl;
+	}
+
+	if (gVerbose > 0) {
+		std::cout << std::endl;
+		if (correct)
+			std::cout << "OK." << std::endl;
+		else 
+			std::cerr << "FEHLER: nicht identische CRC-Ergebnisse!" << std::endl;
+	}
+
 	delete [] gRngBuf;
 
-	return EXIT_SUCCESS;
+	return (correct)? EXIT_SUCCESS : EXIT_FAILURE;
 }
