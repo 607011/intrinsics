@@ -38,8 +38,6 @@ bool isGenuineIntelCPU(void) {
 
 
 bool isCRCSupported(void) {
-	if (!isGenuineIntelCPU())
-		return false;
 	int cpureg[4] = { 0x0, 0x0, 0x0, 0x0 };
 	__cpuid(cpureg, 1);
 	return (cpureg[2] & (1<<20)) != 0;

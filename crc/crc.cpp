@@ -10,6 +10,7 @@
 #include <mersenne_twister.h>
 #include <stopwatch.h>
 #include <boost/crc.hpp>
+#include <nmmintrin.h>
 
 static const int DEFAULT_ITERATIONS = 16;
 static const int DEFAULT_RNGBUF_SIZE = 128;
@@ -77,6 +78,7 @@ struct BenchmarkResult {
 	HANDLE hThread;
 	int iterations;
 	DWORD numCores;
+	bool bindToCore;
 	// output fields
 	__int64 t;
 	__int64 ticks;
@@ -88,7 +90,7 @@ struct BenchmarkResult {
 DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 {
 	BenchmarkResult* result = (BenchmarkResult*)lpParameter;
-	if (gBindToCore)
+	if (result->bindToCore)
 		SetThreadAffinityMask(GetCurrentThread(), 1<<(result->num % result->numCores));
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 	__int64 tMin = MAXLONGLONG;
@@ -99,7 +101,7 @@ DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 #endif
 	for (int i = 0; i < result->iterations; ++i) {
 		__int64 t, ticks;
-		crc = 0x00000000U;
+		crc = 0;
 #if defined(_M_X64)
 		crc64 = 0;
 #endif
@@ -144,7 +146,7 @@ DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 			case Boost:
 				{
 					unsigned int* rn = result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned int);
-					boost::crc_optimal<32, 0x1EDC6F41 , 0, 0, true, true> crcResult;
+					boost::crc_optimal<32, 0x1edc6f41 , 0, 0, true, true> crcResult;
 					crcResult.process_bytes(rn, result->rngBufSize);
 					crc = crcResult.checksum();
 					break;
@@ -158,7 +160,11 @@ DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 	}
 	result->t = tMin;
 	result->ticks = ticksMin;
+#if defined(_M_X64)
 	result->crc = (result->method == Intrinsic64)? (unsigned int)(crc64 & 0xffffffffU) : crc;
+#else
+	result->crc = crc;
+#endif
 	return EXIT_SUCCESS;
 }
 
@@ -176,6 +182,7 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
 		pResult[i].rngBufSize = gRngBufSize;
 		pResult[i].iterations = gIterations;
 		pResult[i].numCores = numCores;
+		pResult[i].bindToCore = gBindToCore;
 		pResult[i].hThread = CreateThread(NULL, 0, BenchmarkThreadProc, (LPVOID)&pResult[i], CREATE_SUSPENDED, NULL);
 		pResult[i].method = method;
 		hThread[i] = pResult[i].hThread; // hThread[] wird von WaitForMultipleObjects() benötigt
@@ -271,7 +278,7 @@ int main(int argc, char* argv[]) {
 		case 'i':
 			if (optarg == NULL) {
 				usage();
-				exit(EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 			gIterations = atoi(optarg);
 			if (gIterations <= 0)
@@ -280,7 +287,7 @@ int main(int argc, char* argv[]) {
 		case 'n':
 			if (optarg == NULL) {
 				usage();
-				exit(EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 			gRngBufSize = atoi(optarg);
 			if (gRngBufSize <= 0)
@@ -291,7 +298,7 @@ int main(int argc, char* argv[]) {
 		case 't':
 			if (optarg == NULL) {
 				usage();
-				exit(EXIT_FAILURE);
+				return EXIT_FAILURE;
 			}
 			if (gThreadIterations < MAX_NUM_THREADS) {
 				int numThreads = atoi(optarg);
