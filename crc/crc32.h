@@ -48,12 +48,7 @@ public:
 			poly = ((poly & 0xff00ff00U) >> 8) | ((poly & 0x00ff00ffU) << 8);
 			poly = (poly >> 16) | (poly << 16);
 		}
-		for (int i = 0; i < 256; ++i) {
-			unsigned int bits = i;
-			for (int j = 0; j < 8; ++j)
-				bits = bits & 1 ? (bits >> 1) ^ poly : bits >> 1;
-			mBits[i] = bits;
-		}
+		makeTable(poly);
 	}
 	unsigned int processBlock(const unsigned char* buf, const unsigned char* const bufEnd)
 	{
@@ -68,6 +63,16 @@ public:
 		return processBlock(buf, buf + len);
 	}
 
+protected:
+	inline void makeTable(unsigned int poly)
+	{
+		for (int i = 0; i < 256; ++i) {
+			unsigned int bits = i;
+			for (int j = 0; j < 8; ++j)
+				bits = bits & 1 ? (bits >> 1) ^ poly : bits >> 1;
+			mBits[i] = bits;
+		}
+	}
 private:
 	unsigned int mCRC;
 	unsigned int mBits[256];

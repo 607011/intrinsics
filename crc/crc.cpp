@@ -185,7 +185,7 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
 	BenchmarkResult* pResult = new BenchmarkResult[numThreads];
 	const DWORD numCores = getNumCores();
 	std::cout.setf(std::ios_base::left, std::ios_base::adjustfield);
-    std::cout << "  " << std::setfill(' ') << std::setw(18) << strMethod << ": Generieren ..." << std::flush;
+    std::cout << "  " << std::setfill(' ') << std::setw(18) << strMethod << "  Generieren ..." << std::flush;
 	for (int i = 0; i < numThreads; ++i) {
 		pResult[i].num = i;
 		pResult[i].rngBuf = gRngBuf;
@@ -220,8 +220,8 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
 
 	std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
 	std::cout << "0x" << std::setfill('0') << std::hex << std::setw(8) << pResult[0].crc
-		<< std::setfill(' ') << std::setw(6) << std::dec << tMin << " ms, " 
-		<< std::fixed << std::setprecision(2) << std::setw(8) << (float)gRngBufSize*gIterations/1024/1024/(1e-3*t)*numThreads << " MByte/s";
+		<< std::setfill(' ') << std::setw(10) << std::dec << tMin << " ms  " 
+		<< std::fixed << std::setprecision(2) << std::setw(8) << (float)gRngBufSize*gIterations/1024/1024/(1e-3*t)*numThreads << " MB/s";
 
 	std::cout << std::endl;
 
@@ -338,6 +338,14 @@ int main(int argc, char* argv[]) {
 
 	evaluateCPUFeatures();
 
+	if (!isCRCSupported()) {
+		std::cout
+			<< "//////////////////////////////////////////////////////" << std::endl
+			<< "/// Die CPU unterstützt die CRC-Instruktion nicht. ///" << std::endl
+			<< "/// Die _mm_crc32_uxx-Benchmarks entfallen daher.  ///" << std::endl
+			<< "//////////////////////////////////////////////////////" << std::endl;
+	}
+
 	// Speicherblöcke mit Zufallszahlen belegen
 	MersenneTwister gen;
 	gen.seed();
@@ -365,8 +373,11 @@ int main(int argc, char* argv[]) {
 	std::cout << "Bilden der Prüfsummen (" << gIterations << "x" << (gRngBufSize/1024/1024) << " MByte) ..." << std::endl;
 	for (int i = 0; i <= gThreadIterations && gNumThreads[i] > 0 ; ++i) {
 		const int numThreads = gNumThreads[i];
-		if (gVerbose > 0)
-			std::cout << std::endl << "... in " << numThreads << " Thread" << (numThreads == 1? "" : "s") << ":" << std::endl << std::endl;
+		std::cout << std::endl
+			<< "... in " << numThreads << " Thread" << (numThreads == 1? "" : "s") << ":" << std::endl
+			<< std::endl
+			<< "  Methode             CRC             t/Block      Durchsatz" << std::endl
+			<< "  ----------------------------------------------------------" << std::endl;
 		if (isCRCSupported()) {
 			runBenchmark(numThreads, "_mm_crc32_u8", Intrinsic8);
 			runBenchmark(numThreads, "_mm_crc32_u16", Intrinsic16);
@@ -374,10 +385,6 @@ int main(int argc, char* argv[]) {
 #if defined(_M_X64)
 			runBenchmark(numThreads, "_mm_crc32_u64", Intrinsic64);
 #endif
-		}
-		else {
-			std::cout << "  [ Die CPU kennt keine CRC-Instruktion.             ]" << std::endl
-				<< "  [ Die _mm_crc32_uxx-Benchmarks laufen daher nicht. ]" << std::endl;
 		}
 		runBenchmark(numThreads, "boost::crc",    Boost);
 		runBenchmark(numThreads, "default",       DefaultFast);
