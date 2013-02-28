@@ -11,6 +11,7 @@
 #include <stopwatch.h>
 #include <boost/crc.hpp>
 #include <nmmintrin.h>
+#include "crc32.h"
 
 static const int DEFAULT_ITERATIONS = 16;
 static const int DEFAULT_RNGBUF_SIZE = 128;
@@ -55,7 +56,8 @@ enum Method {
 #if defined(_M_X64)
 	Intrinsic64,
 #endif
-	Boost
+	Boost,
+	DefaultFast
 };
 
 
@@ -146,9 +148,15 @@ DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 			case Boost:
 				{
 					unsigned int* rn = result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned int);
-					boost::crc_optimal<32, 0x1edc6f41 , 0, 0, true, true> crcResult;
+					boost::crc_optimal<32U, 0x1edc6f41U, 0U, 0U, true, true> crcResult;
 					crcResult.process_bytes(rn, result->rngBufSize);
 					crc = crcResult.checksum();
+					break;
+				}
+			case DefaultFast:
+				{
+					unsigned char* rn = (unsigned char*)result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned char);
+					crc = crc32_fast<0U, 0x1edc6f41U, true>(rn, result->rngBufSize);
 					break;
 				}
 			}
@@ -260,10 +268,6 @@ void disclaimer(void) {
 
 
 int main(int argc, char* argv[]) {
-	if (!isCRCSupported()) {
-		std::cerr << "FEHLER: Dieser Computer unterstützt die CRC-Instruktion leider nicht!" << std::endl;
-		return EXIT_FAILURE;
-	}
 	gThreadPriority = GetThreadPriority(GetCurrentThread());
 	SecureZeroMemory(gNumThreads+1, sizeof(gNumThreads[0]) * (MAX_NUM_THREADS-1));
 	for (;;) {
@@ -360,14 +364,21 @@ int main(int argc, char* argv[]) {
 	for (int i = 0; i <= gThreadIterations && gNumThreads[i] > 0 ; ++i) {
 		const int numThreads = gNumThreads[i];
 		if (gVerbose > 0)
-			std::cout << std::endl << "... in " << numThreads << " Thread" << (numThreads == 1? "" : "s") << ":" << std::endl;
-		runBenchmark(numThreads, "_mm_crc32_u8", Intrinsic8);
-		runBenchmark(numThreads, "_mm_crc32_u16", Intrinsic16);
-		runBenchmark(numThreads, "_mm_crc32_u32", Intrinsic32);
+			std::cout << std::endl << "... in " << numThreads << " Thread" << (numThreads == 1? "" : "s") << ":" << std::endl << std::endl;
+		if (isCRCSupported()) {
+			runBenchmark(numThreads, "_mm_crc32_u8", Intrinsic8);
+			runBenchmark(numThreads, "_mm_crc32_u16", Intrinsic16);
+			runBenchmark(numThreads, "_mm_crc32_u32", Intrinsic32);
 #if defined(_M_X64)
-		runBenchmark(numThreads, "_mm_crc32_u64", Intrinsic64);
+			runBenchmark(numThreads, "_mm_crc32_u64", Intrinsic64);
 #endif
+		}
+		else {
+			std::cout << "  [ Die CPU kennt keine CRC-Instruktion.             ]" << std::endl
+				<< "  [ Die _mm_crc32_uxx-Benchmarks laufen daher nicht. ]" << std::endl;
+		}
 		runBenchmark(numThreads, "boost::crc",    Boost);
+		runBenchmark(numThreads, "default",       DefaultFast);
 	}
 
 	if (gVerbose > 1) 
@@ -387,7 +398,7 @@ int main(int argc, char* argv[]) {
 		if (correct)
 			std::cout << "OK." << std::endl;
 		else 
-			std::cerr << "FEHLER: nicht identische CRC-Ergebnisse!" << std::endl;
+			std::cerr << "FEHLER: unterschiedliche CRC-Ergebnisse!" << std::endl;
 	}
 
 	delete [] gRngBuf;

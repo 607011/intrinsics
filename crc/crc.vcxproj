@@ -154,6 +154,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="crc.cpp" />
+    <ClCompile Include="crc32.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\getopt\getopt.vcxproj">
@@ -165,6 +166,9 @@
     <ProjectReference Include="..\sharedutil\sharedutil.vcxproj">
       <Project>{eaea0657-2b19-4a1b-bdb0-7be7e3c64349}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="crc32.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
