@@ -156,7 +156,9 @@ DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 			case DefaultFast:
 				{
 					unsigned char* rn = (unsigned char*)result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned char);
-					crc = crc32_fast<0U, 0x1edc6f41U, true>(rn, result->rngBufSize);
+					CRC32<0U, 0x1edc6f41U, true> crc32_fast;
+					crc = crc32_fast.process(rn, result->rngBufSize);
+					// crc = crc32_fast<0U, 0x1edc6f41U, true>(rn, result->rngBufSize);
 					break;
 				}
 			}

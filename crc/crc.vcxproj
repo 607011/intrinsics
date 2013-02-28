@@ -154,7 +154,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="crc.cpp" />
-    <ClCompile Include="crc32.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\getopt\getopt.vcxproj">
