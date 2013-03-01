@@ -26,6 +26,16 @@ class Stopwatch {
     : mT(dTime)
     , mTicks(dTicks)
   {
+    start();
+  }
+
+  inline ~Stopwatch()
+  {
+    stop();
+  }
+
+  inline void start(void)
+  {
     mT = INVALID;
     mTicks = INVALID;
 #ifdef WIN32
@@ -37,10 +47,7 @@ class Stopwatch {
 #endif
     mTicks0 = (int64_t)__rdtsc();
   }
-  inline ~Stopwatch()
-  {
-    stop();
-  }
+
   inline void stop(void)
   {
     mTicks = (int64_t)__rdtsc() - mTicks0;
@@ -55,6 +62,9 @@ class Stopwatch {
     mT = (t.tv_sec * 1000 + t.tv_nsec / 1000) - mPC0;
 #endif
   }
+
+  int64_t t(void) const { return mT; }
+
   static const int64_t INVALID = -1;
   
  private:

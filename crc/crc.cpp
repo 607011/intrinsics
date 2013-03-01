@@ -213,7 +213,12 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
   BenchmarkResult* pResult = new BenchmarkResult[numThreads];
   const DWORD numCores = getNumCores();
   std::cout.setf(std::ios_base::left, std::ios_base::adjustfield);
-  std::cout << "  " << std::setfill(' ') << std::setw(18) << strMethod << "  Generieren ..." << std::flush;
+  std::cout << "  " << std::setfill(' ') << std::setw(18) << strMethod << "  Generieren ...";
+  int64_t t = LLONG_MAX;
+  int64_t ticks = LLONG_MAX;
+#ifndef WIN32
+  Stopwatch stopwatch(t, ticks);
+#endif
   for (int i = 0; i < numThreads; ++i) {
     pResult[i].num = i;
     pResult[i].rngBuf = gRngBuf;
@@ -232,20 +237,18 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
   std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
   std::cout << "Berechnen des CRC ...";
   
-  int64_t t = LLONG_MAX;
-  int64_t ticks = LLONG_MAX;
   {
-    Stopwatch stopwatch(t, ticks);
 #ifdef WIN32
+    Stopwatch stopwatch(t, ticks);
     for (int i = 0; i < numThreads; ++i) {
       ResumeThread(hThread[i]);
-#endif
     }
-#ifdef WIN32
     WaitForMultipleObjects(numThreads, hThread, TRUE, INFINITE);
 #else
     for (int i = 0; i < numThreads; ++i) {
       pthread_join(hThread[i], 0);
+    }
+    t = stopwatch.t();
 #endif
   }
   std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b";

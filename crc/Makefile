@@ -12,7 +12,7 @@ CXX = g++
 
 LIBS = -L../sharedutil -L../rng -lsharedutil -lrng -lrt -lpthread
 
-LDFLAGS = -s
+LDFLAGS = -s -static
 
 .SUFFIXES = .cpp
 
