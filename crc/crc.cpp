@@ -1,6 +1,9 @@
 // Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
 
+#ifdef WIN32
 #include <Windows.h>
+#include <nmmintrin.h>
+#endif
 #include <iostream>
 #include <iomanip>
 #include <vector>
@@ -10,8 +13,11 @@
 #include <mersenne_twister.h>
 #include <stopwatch.h>
 #include <boost/crc.hpp>
-#include <nmmintrin.h>
 #include "crc32.h"
+
+#ifndef WIN32
+typedef unsigned int DWORD;
+#endif
 
 static const int DEFAULT_ITERATIONS = 16;
 static const int DEFAULT_RNGBUF_SIZE = 128;
@@ -76,7 +82,7 @@ struct BenchmarkResult {
 	Method method;
 	unsigned int* rngBuf;
 	int rngBufSize;
-	int num;
+	DWORD num;
 	HANDLE hThread;
 	int iterations;
 	DWORD numCores;
@@ -92,8 +98,11 @@ struct BenchmarkResult {
 DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 {
 	BenchmarkResult* result = (BenchmarkResult*)lpParameter;
-	if (result->bindToCore)
-		SetThreadAffinityMask(GetCurrentThread(), 1<<(result->num % result->numCores));
+	if (result->bindToCore) {
+		DWORD_PTR affinityMask = 1 << (result->num % result->numCores);
+		std::cout << "0x" << std::hex << std::setw(8) << affinityMask << std::endl;
+		SetThreadAffinityMask(GetCurrentThread(), affinityMask);
+	}
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 	__int64 tMin = MAXLONGLONG;
 	__int64 ticksMin = MAXLONGLONG;
@@ -148,9 +157,9 @@ DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
 			case Boost:
 				{
 					unsigned int* rn = result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned int);
-					boost::crc_optimal<32U, 0x1edc6f41U, 0U, 0U, true, true> crcResult;
-					crcResult.process_bytes(rn, result->rngBufSize);
-					crc = crcResult.checksum();
+					boost::crc_optimal<32U, 0x1edc6f41U, 0U, 0U, true, true> crcBoost;
+					crcBoost.process_bytes(rn, result->rngBufSize);
+					crc = crcBoost.checksum();
 					break;
 				}
 			case DefaultFast:
@@ -230,7 +239,7 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
 
 
 void usage(void) {
-	std::cout << "Aufruf: crc.exe [Optionen]" << std::endl
+	std::cout << "Aufruf: crc [Optionen]" << std::endl
 		<< std::endl
 		<< "Optionen:" << std::endl
 		<< "  -n N" << std::endl
@@ -239,6 +248,10 @@ void usage(void) {
 		<< "  --iterations N" << std::endl
 		<< "  -i N" << std::endl
 		<< "     Generieren N Mal wiederholen (Vorgabe: " << DEFAULT_ITERATIONS << ")" << std::endl
+		<< std::endl
+		<< "  --no-bind-to-core" << std::endl
+		<< "  -0" << std::endl
+		<< "     Threads nicht Prozessorkerne binden" << std::endl
 		<< std::endl
 		<< "  --quiet" << std::endl
 		<< "  -q" << std::endl
@@ -273,7 +286,7 @@ int main(int argc, char* argv[]) {
 	SecureZeroMemory(gNumThreads+1, sizeof(gNumThreads[0]) * (MAX_NUM_THREADS-1));
 	for (;;) {
 		int option_index = 0;
-		int c = getopt_long(argc, argv, "vh?n:t:i:", long_options, &option_index);
+		int c = getopt_long(argc, argv, "vh0?n:t:i:", long_options, &option_index);
 		if (c == -1)
 			break;
 		switch (c)
@@ -326,6 +339,8 @@ int main(int argc, char* argv[]) {
 			usage();
 			return EXIT_SUCCESS;
 			break;
+		case '0':
+			// fall-through
 		case SELECT_NO_BIND_TO_CORE:
 			gBindToCore = false;
 			break;

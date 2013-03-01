@@ -108,7 +108,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\boost_1_48_0;C:\Program Files\Microsoft SDKs\Windows\v7.0A\Include;C:\pthreads-2.8.0\include;D:\WINDDK\7600.16385.0\inc\ddk;D:\WINDDK\7600.16385.0\inc\api;$(IncludePath);$(SolutionDir)\getopt</IncludePath>
+    <IncludePath>$(IncludePath);$(SolutionDir)\getopt;$(SolutionDir)\sharedutil;$(SolutionDir)\rng</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release 64 Bit|Win32'">
     <LinkIncremental>false</LinkIncremental>

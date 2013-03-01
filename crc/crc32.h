@@ -2,38 +2,7 @@
 
 #pragma once
 
-
 typedef unsigned char byte;
-
-// CRC32 als Template-Funktion
-template <unsigned int CRC0, unsigned int POLYNOMIAL, bool REVERSE>
-unsigned int crc32_fast(const byte* buf, unsigned int len)
-{
-	unsigned int poly = POLYNOMIAL;
-	// ggf. Bitfolge des Polynoms umkehren
-	if (REVERSE) {
-		poly = ((poly & 0xaaaaaaaa) >> 1) | ((poly & 0x55555555) << 1);
-		poly = ((poly & 0xcccccccc) >> 2) | ((poly & 0x33333333) << 2);
-		poly = ((poly & 0xf0f0f0f0) >> 4) | ((poly & 0x0f0f0f0f) << 4);
-		poly = ((poly & 0xff00ff00) >> 8) | ((poly & 0x00ff00ff) << 8);
-		poly = (poly >> 16) | (poly << 16);
-	}
-	// Tabelle generieren
-	unsigned int bits_table[256];
-	for (int i = 0; i < 256; ++i) {
-		unsigned int bits = i;
-		for (int j = 0; j < 8; ++j)
-			bits = bits & 1 ? (bits >> 1) ^ poly : bits >> 1;
-		bits_table[i] = bits;
-	}
-	// CRC berechnen
-	unsigned int crc = CRC0;
-	const byte* const bufEnd = buf + len;
-	while (buf < bufEnd)
-		crc = bits_table[crc & 0xffU ^ *buf++] ^ (crc >> 8);
-	return crc;
-}
-
 
 // CRC32 als Template-Klasse
 template <unsigned int V0, unsigned int POLYNOMIAL, bool REV>
@@ -55,6 +24,10 @@ public:
 
 	inline unsigned int process(const byte* buf, int len) {
 		return processBlock(buf, buf + len);
+	}
+
+	inline void reset(void) {
+		mCRC = V0;
 	}
 
 protected:
@@ -80,13 +53,27 @@ private:
 	unsigned int mBits[256];
 };
 
+#ifndef WIN32
+inline unsigned int _mm_crc32_u8(unsigned int v, unsigned char c) {
+	return __builtin_ia32_crc32qi(v, c);
+}
+inline unsigned int _mm_crc32_u16(unsigned int v, unsigned short c) {
+	return __builtin_ia32_crc32hi(v, c);
+}
+inline unsigned int _mm_crc32_u32(unsigned int v, unsigned int c) {
+	return __builtin_ia32_crc32si(v, c);
+}
+inline unsigned __int64 _mm_crc32_u64(unsigned int v, unsigned __int64 c) {
+	return __builtin_ia32_crc32di(v, c);
+}
+#endif
 
 typedef CRC32<0U, 0x1edc6f41U, true> CRC32C;
 typedef CRC32C CRC32_SSE42;
 typedef CRC32C CRC32_iSCSI;
 typedef CRC32C CRC32_SCTP;
 typedef CRC32C CRC32_Btrfs;
-typedef CRC32C CRC32_ext4;
+typedef CRC32C CRC32_Ext4;
 
 typedef CRC32<0U, 0x04c11db7U, true> CRC32_Ethernet;
 typedef CRC32_Ethernet CRC32_HDLC;
