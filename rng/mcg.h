@@ -1,6 +1,7 @@
 // Copyright (c) 2008-2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
 
-#pragma once
+#ifndef __INTRINSICS_MCG_H_
+#define __INTRINSICS_MCG_H_
 
 #include "abstract_random_number_generator.h"
 
@@ -25,3 +26,5 @@ private:
 };
 
 typedef MultiplicativeCongruential<1> MCG;
+
+#endif

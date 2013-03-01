@@ -1,7 +1,8 @@
 // Copyright (c) 2008-2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
 // Portiert von http://www.agner.org/random/
 
-#pragma once
+#ifndef __INTRINSICS_MARSAGLIA_H_
+#define __INTRINSICS_MARSAGLIA_H_
 
 #include "abstract_random_number_generator.h"
 
@@ -39,3 +40,4 @@ private:
 	unsigned int mR[5];
 };
 
+#endif

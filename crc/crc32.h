@@ -1,70 +1,75 @@
 // Copyright (c) 2008-2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
 
-#pragma once
+#ifndef __CRC32_H_
+#define __CRC32_H_
 
-typedef unsigned char byte;
+#ifndef WIN32
+#include <stdint.h>
+#include <inttypes.h>
+#include <pthread.h>
+#endif
 
 // CRC32 als Template-Klasse
-template <unsigned int V0, unsigned int POLYNOMIAL, bool REV>
+template<uint32_t V0, uint32_t POLYNOMIAL, bool REV>
 class CRC32 {
 public:
-	CRC32(void) : mCRC(V0) {
-		makeTable(REV? reverseBits(POLYNOMIAL) : POLYNOMIAL);
-	}
-
-	int processBlock(const byte* buf, const byte* const bufEnd) {
-		unsigned int crc = mCRC;
-		while (buf < bufEnd) {
-			const byte b = *buf++;
-			crc = mBits[crc & 0xffU ^ b] ^ (crc >> 8);
-		}
-		mCRC = crc;
-		return crc;
-	}
-
-	inline unsigned int process(const byte* buf, int len) {
-		return processBlock(buf, buf + len);
-	}
-
-	inline void reset(void) {
-		mCRC = V0;
-	}
-
+ CRC32(void) : mCRC(V0) {
+    makeTable(REV? reverseBits(POLYNOMIAL) : POLYNOMIAL);
+  }
+  
+  uint32_t processBlock(const uint8_t* buf, const uint8_t* const bufEnd) {
+    uint32_t crc = mCRC;
+    while (buf < bufEnd) {
+      const uint8_t b = *buf++;
+      crc = mBits[(crc & 0xffU) ^ b] ^ (crc >> 8);
+    }
+    mCRC = crc;
+    return crc;
+  }
+  
+  inline uint32_t process(const uint8_t* buf, int len) {
+    return processBlock(buf, buf + len);
+  }
+  
+  inline void reset(void) {
+    mCRC = V0;
+  }
+  
 protected:
-	inline void makeTable(unsigned int poly) {
-		for (int i = 0; i < 256; ++i) {
-			unsigned int bits = i;
-			for (int j = 0; j < 8; ++j)
-				bits = (bits & 1)? (bits >> 1) ^ poly : bits >> 1;
-			mBits[i] = bits;
-		}
-	}
-
-	static inline unsigned int reverseBits(unsigned int x) {
-		x = ((x & 0xaaaaaaaaU) >> 1) | ((x & 0x55555555U) << 1);
-		x = ((x & 0xccccccccU) >> 2) | ((x & 0x33333333U) << 2);
-		x = ((x & 0xf0f0f0f0U) >> 4) | ((x & 0x0f0f0f0fU) << 4);
-		x = ((x & 0xff00ff00U) >> 8) | ((x & 0x00ff00ffU) << 8);
-		return (x >> 16) | (x << 16);
-	}
-
-private:
-	unsigned int mCRC;
-	unsigned int mBits[256];
+  inline void makeTable(uint32_t poly) {
+    for (int i = 0; i < 256; ++i) {
+      uint32_t bits = i;
+      for (int j = 0; j < 8; ++j)
+	bits = (bits & 1)? (bits >> 1) ^ poly : bits >> 1;
+      mBits[i] = bits;
+    }
+  }
+  
+  static inline uint32_t reverseBits(uint32_t x) {
+    x = ((x & 0xaaaaaaaaU) >> 1) | ((x & 0x55555555U) << 1);
+    x = ((x & 0xccccccccU) >> 2) | ((x & 0x33333333U) << 2);
+    x = ((x & 0xf0f0f0f0U) >> 4) | ((x & 0x0f0f0f0fU) << 4);
+    x = ((x & 0xff00ff00U) >> 8) | ((x & 0x00ff00ffU) << 8);
+    return (x >> 16) | (x << 16);
+  }
+  
+ private:
+  uint32_t mCRC;
+  uint32_t mBits[256];
 };
 
 #ifndef WIN32
-inline unsigned int _mm_crc32_u8(unsigned int v, unsigned char c) {
-	return __builtin_ia32_crc32qi(v, c);
+inline uint32_t _mm_crc32_u8(uint32_t v, uint8_t c) {
+  return __builtin_ia32_crc32qi(v, c);
 }
-inline unsigned int _mm_crc32_u16(unsigned int v, unsigned short c) {
-	return __builtin_ia32_crc32hi(v, c);
+inline uint32_t _mm_crc32_u16(uint32_t v, uint16_t c) {
+  return __builtin_ia32_crc32hi(v, c);
 }
-inline unsigned int _mm_crc32_u32(unsigned int v, unsigned int c) {
-	return __builtin_ia32_crc32si(v, c);
+inline uint32_t _mm_crc32_u32(uint32_t v, uint32_t c) {
+  return __builtin_ia32_crc32si(v, c);
 }
-inline unsigned __int64 _mm_crc32_u64(unsigned int v, unsigned __int64 c) {
-	return __builtin_ia32_crc32di(v, c);
+inline uint64_t _mm_crc32_u64(uint32_t v, uint64_t c) {
+  return __builtin_ia32_crc32di(v, c);
 }
 #endif
 
@@ -92,3 +97,5 @@ typedef CRC32K CRC32_Koopmann;
 typedef CRC32<0U, 0x814141abU, true> CRC32Q;
 typedef CRC32Q CRC32_Aviation;
 typedef CRC32Q CRC32_AIXM;
+
+#endif

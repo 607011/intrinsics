@@ -4,9 +4,13 @@
 *.opensdf
 *.suo
 *.user
+*.o
+*.a
 Debug/*
 Release/*
 getopt/Debug/*
 getopt/Release/*
 rdrand/Debug/*
 rdrand/Release/*
+Makefile.bak
+Makefile~
