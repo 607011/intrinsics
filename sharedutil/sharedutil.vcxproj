@@ -19,11 +19,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="gnutypes.h" />
+    <ClInclude Include="sharedutil.h" />
     <ClInclude Include="stopwatch.h" />
-    <ClInclude Include="util.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="util.cpp" />
+    <ClCompile Include="sharedutil.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{EAEA0657-2B19-4A1B-BDB0-7BE7E3C64349}</ProjectGuid>

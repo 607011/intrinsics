@@ -5,6 +5,7 @@
 #define _CRT_RAND_S
 #include <Windows.h>
 #include <intrin.h>
+#include "gnutypes.h"
 #else
 #include <unistd.h>
 #include <cpuid.h>

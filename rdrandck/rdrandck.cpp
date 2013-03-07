@@ -4,7 +4,7 @@
 #include <tchar.h>
 #include <string.h>
 #include <intrin.h>
-#include <util.h>
+#include "sharedutil.h"
 
 int _tmain(int argc, _TCHAR* argv[])
 {

@@ -4,9 +4,11 @@
 #ifndef __INTRINSICS_ABSTRACT_RANDOM_NUMBER_GENERATOR_H_
 #define __INTRINSICS_ABSTRACT_RANDOM_NUMBER_GENERATOR_H_
 
-#ifdef WIN32
+#if defined(WIN32)
 #include <Windows.h>
-#else
+#include "gnutypes.h"
+#endif
+#if defined(__GNUC__)
 #include <time.h>
 #endif
 

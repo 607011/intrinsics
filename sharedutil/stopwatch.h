@@ -6,6 +6,7 @@
 #if defined(WIN32)
 #include <Windows.h>
 #include <immintrin.h>
+#include "gnutypes.h"
 #endif
 
 #if defined(__GNUC__)

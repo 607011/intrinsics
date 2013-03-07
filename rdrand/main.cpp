@@ -8,13 +8,13 @@
 
 #include <getopt.h>
 #include <stopwatch.h>
-#include <util.h>
 #include <mersenne_twister.h>
 #include <marsaglia.h>
 #include <mcg.h>
 #include <circ.h>
 
 #include "rdrand.h"
+#include "sharedutil.h"
 
 static const int DEFAULT_ITERATIONS = 12;
 static const int DEFAULT_RNGBUF_SIZE = 256;
