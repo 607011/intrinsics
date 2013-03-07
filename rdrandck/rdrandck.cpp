@@ -1,15 +1,18 @@
 // Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
+// All rights reserved.
 
+#if defined(WIN32)
 #include <Windows.h>
-#include <tchar.h>
-#include <string.h>
-#include <intrin.h>
+#endif
+
+#include <iostream>
+
 #include "sharedutil.h"
 
-int _tmain(int argc, _TCHAR* argv[])
+int main(int argc, char* argv[])
 {
-	bool supported = isRdRandSupported();
-	const _TCHAR* msg = supported? TEXT("Der Prozessor unterstützt RDRAND.\n") : TEXT("Der Prozessor unterstützt RDRAND *nicht*.\n");
-	WriteConsole(GetStdHandle(STD_OUTPUT_HANDLE), msg, lstrlen(msg), NULL, NULL);
+	const bool supported = isRdRandSupported();
+	const char* msg = supported? "Der Prozessor unterstuetzt RDRAND.\n" : "Der Prozessor unterstuetzt RDRAND *nicht*.\n";
+	std::cout <<  msg << std::endl;
 	return supported? EXIT_SUCCESS : EXIT_FAILURE;
 }

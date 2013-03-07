@@ -1,4 +1,5 @@
 // Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
+// All rights reserved.
 
 #if defined(WIN32)
 #include <Windows.h>

@@ -1,5 +1,5 @@
 // Copyright (c) 2008-2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
-// Alle Rechte vorbehalten.
+// All rights reserved.
 
 #ifndef __INTRINSICS_ABSTRACT_RANDOM_NUMBER_GENERATOR_H_
 #define __INTRINSICS_ABSTRACT_RANDOM_NUMBER_GENERATOR_H_
