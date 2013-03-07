@@ -7,8 +7,9 @@
 #if defined(WIN32)
 #include <Windows.h>
 #include "gnutypes.h"
-#endif
-#if defined(__GNUC__)
+#elif defined(__GNUC__)
+#include <inttypes.h>
+#include <stdint.h>
 #include <time.h>
 #endif
 
@@ -22,7 +23,7 @@ class AbstractRandomNumberGenerator
 public:
  AbstractRandomNumberGenerator(void)
    : mInvalid(0)
-    , mLimitExceeded(0) 
+   , mLimitExceeded(0) 
     { /* ... */ }
   virtual ~AbstractRandomNumberGenerator() { /* ... */ }
   virtual T operator()(void) = 0;
@@ -51,14 +52,14 @@ template <typename T>
 T AbstractRandomNumberGenerator<T>::makeSeed(void)
 {
   T seed = 0;
-#ifdef WIN32
+#if defined(WIN32)
   if (isRdRandSupported()) {
     seed = (T)getRdRand32();
   }
   else { 
     seed = (T)GetTickCount();
   }
-#else
+#elif defined(__GNUC__)
   seed = (T)clock();
 #endif
   return seed;
@@ -66,7 +67,7 @@ T AbstractRandomNumberGenerator<T>::makeSeed(void)
 
 
 typedef AbstractRandomNumberGenerator<uint8_t> ByteRandomNumberGenerator;
-typedef AbstractRandomNumberGenerator<uint32_t> UIntRandomNumberGenerator;
+typedef AbstractRandomNumberGenerator<uint32_t> UInt32RandomNumberGenerator;
 typedef AbstractRandomNumberGenerator<uint64_t> UInt64RandomNumberGenerator;
 
 
@@ -79,7 +80,7 @@ class DummyByteGenerator : public ByteRandomNumberGenerator
 };
 
 
-class DummyUIntGenerator : public UIntRandomNumberGenerator
+class DummyUIntGenerator : public UInt32RandomNumberGenerator
 {
  public:
   DummyUIntGenerator(void) { }

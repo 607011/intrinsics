@@ -9,21 +9,20 @@ template <typename T, T M, T X0>
 class Circular : public AbstractRandomNumberGenerator<T>
 {
 public:
-	Circular(T m = M, T seed = X0)
-		: mM(m)
-		, mR(seed)
-	{ }
-	T operator()() { return mR++ % mM; }
-	inline void seed(T _Seed) { mR = _Seed; }
-	inline void seed(void) { seed(makeSeed()); }
-	static const char* name(void) { return "CircularBytes"; }
-
-private:
-	T mM;
-	T mR;
+ Circular(T m = M, T seed = X0)
+   : mM(m)
+   , mR(seed)
+  { }
+  T operator()() { return mR++ % mM; }
+  inline void seed(T _Seed) { mR = _Seed; }
+  static const char* name(void) { return "CircularBytes"; }
+  
+ private:
+  T mM;
+  T mR;
 };
 
-typedef Circular<unsigned char, 255, 0> CircularBytes;
+typedef Circular<uint8_t, 255, 0> CircularBytes;
 
 
 #endif

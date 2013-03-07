@@ -8,7 +8,7 @@ OUT = librng.a
 
 INCLUDES = -I../sharedutil
 
-CXXFLAGS = -Wall -O2 -m64 -march=corei7 -msse4.2 -mrdrnd -mcrc32
+CXXFLAGS = -Wall -O2 -m64 -march=corei7 -msse4.2 -mrdrnd -mcrc32 
 
 CXX = g++
 

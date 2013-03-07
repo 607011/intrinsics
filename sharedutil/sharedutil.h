@@ -27,18 +27,18 @@ extern void evaluateCPUFeatures(void);
 extern unsigned int getNumCores(void);
 
 #if defined(__GNUC__)
-inline  unsigned int _rdrand8_step(unsigned char* x) {
+inline  unsigned int _rdrand8_step(uint8_t* x) {
   (void)x; 
   return 0; // TODO
 }
-inline  unsigned int _rdrand16_step(unsigned short* x) {
+inline  unsigned int _rdrand16_step(uint16_t* x) {
   return __builtin_ia32_rdrand16_step(x);
 }
-inline  unsigned int _rdrand32_step(unsigned int* x) {
+inline  unsigned int _rdrand32_step(uint32_t* x) {
   return __builtin_ia32_rdrand32_step(x);
 }
-inline  unsigned int _rdrand64_step(unsigned long long* x) {
-  return __builtin_ia32_rdrand64_step(x);
+inline  unsigned int _rdrand64_step(uint64_t* x) {
+  return __builtin_ia32_rdrand64_step(reinterpret_cast<long long unsigned int*>(x));
 }
 #endif
 
