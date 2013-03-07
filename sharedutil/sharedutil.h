@@ -1,4 +1,5 @@
 // Copyright (c) 2008-2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
+// All rights reserved.
 
 #ifndef __INTRINSICS_UTIL_H_
 #define __INTRINSICS_UTIL_H_
