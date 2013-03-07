@@ -7,7 +7,7 @@ extern "C" {
 
 extern int gVerbose;
 
-#ifdef WIN32
+#if defined(WIN32)
 extern bool hasRand_s(void);
 typedef __int32 int32_t;
 typedef __int64 int64_t;
@@ -15,7 +15,7 @@ typedef unsigned __int32 uint32_t;
 typedef unsigned __int64 uint64_t;
 #endif
 
-#ifndef WIN32
+#if defined(__GNUC__)
 #include <stdint.h>
 #include <inttypes.h>
 #endif
@@ -24,13 +24,13 @@ extern bool isGenuineIntelCPU(void);
 extern bool isRdRandSupported(void);
 extern bool isCRCSupported(void);
 extern unsigned int getRdRand32(void);
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
 extern unsigned long long getRdRand64(void);
 #endif
 extern void evaluateCPUFeatures(void);
 extern unsigned int getNumCores(void);
 
-#ifndef WIN32
+#if defined(__GNUC__)
 inline  unsigned int _rdrand8_step(unsigned char* x) {
   (void)x; 
   return 0; // TODO

@@ -3,18 +3,17 @@
 #ifndef __INTRINSICS_STOPWATCH_H_
 #define __INTRINSICS_STOPWATCH_H_
 
-#ifdef WIN32
+#if defined(WIN32)
 #include <Windows.h>
 #include <immintrin.h>
 #endif
 
-#ifndef WIN32
-inline volatile long long __rdtsc() {
+#if defined(__GNUC__)
+inline volatile long long __rdtsc(void) {
   register long long TSC asm("eax");
   asm volatile (".byte 15, 49" : : : "eax", "edx");
   return TSC;
 }
-
 #include <time.h>
 #include <inttypes.h>
 #include <stdint.h>
@@ -41,9 +40,7 @@ class Stopwatch {
 #ifdef WIN32
     QueryPerformanceCounter(&mPC0);
 #else
-    struct timespec t;
-    clock_gettime(CLOCK_MONOTONIC, &t);
-    mPC0 = t.tv_sec * 1000 + t.tv_nsec / 1000;
+    mPC0 = currentMS();
 #endif
     mTicks0 = (int64_t)__rdtsc();
   }
@@ -57,22 +54,26 @@ class Stopwatch {
     QueryPerformanceFrequency(&freq);
     mT = 1000 * (pc.QuadPart - mPC0.QuadPart) / freq.QuadPart;
 #else
-    struct timespec t;
-    clock_gettime(CLOCK_MONOTONIC, &t);
-    mT = (t.tv_sec * 1000 + t.tv_nsec / 1000) - mPC0;
+    mT = currentMS() - mPC0;
 #endif
   }
 
-  int64_t t(void) const { return mT; }
+#ifndef WIN32
+  inline int64_t currentMS(void) const {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (int64_t)t.tv_sec * 1000 + (int64_t)t.tv_nsec / 1000000;
+  }
+#endif
 
   static const int64_t INVALID = -1;
   
  private:
   int64_t& mT;
   int64_t& mTicks;
-#ifdef WIN32
+#if defined(WIN32)
   LARGE_INTEGER mPC0;
-#else
+#elif defined(__GNUC__)
   int64_t mPC0;
 #endif
   int64_t mTicks0;

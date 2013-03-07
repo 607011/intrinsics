@@ -1,9 +1,10 @@
 // Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
 
-#ifdef WIN32
+#if defined(WIN32)
 #include <Windows.h>
 #include <nmmintrin.h>
 #endif
+
 #include <iostream>
 #include <iomanip>
 #include <vector>
@@ -16,7 +17,7 @@
 #include "sharedutil.h"
 #include "crc32.h"
 
-#ifndef WIN32
+#if defined(__GNUC__)
 typedef unsigned int DWORD;
 typedef pthread_t HANDLE;
 #include <strings.h>
@@ -62,7 +63,7 @@ enum Method {
 	Intrinsic8,
 	Intrinsic16,
 	Intrinsic32,
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
 	Intrinsic64,
 #endif
 	Boost,
@@ -100,40 +101,39 @@ struct BenchmarkResult {
 
 
 // die im Thread laufenden Benchmark-Routine
-#ifdef WIN32
+#if defined(WIN32)
 DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
-#else
+#elif defined(__GNUC__)
 void* BenchmarkThreadProc(void* lpParameter)
 #endif
 {
   BenchmarkResult* result = (BenchmarkResult*)lpParameter;
   if (result->bindToCore) {
+#if defined(WIN32)
     DWORD affinityMask = 1 << (result->num % result->numCores);
-    std::cout << "0x" << std::hex << std::setw(8) << affinityMask << std::endl;
-#ifdef WIN32
     SetThreadAffinityMask(GetCurrentThread(), affinityMask);
-#else
+#elif defined(__GNUC__)
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
     CPU_SET(result->num, &cpuset);
     sched_setaffinity(pthread_self(), sizeof(cpu_set_t), &cpuset); 
 #endif
   }
-#ifdef WIN32
+#if defined(WIN32)
   SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
-#else
+#elif defined(__GNUC__)
   // TODO
 #endif
   int64_t tMin = LLONG_MAX;
   int64_t ticksMin = LLONG_MAX;
-  unsigned int crc = 0;
-#if defined(_M_X64)
-  unsigned int64_t crc64 = 0;
+  uint32_t crc = 0;
+#if defined(_M_X64) || defined(__x86_64__)
+  uint64_t crc64 = 0;
 #endif
   for (int i = 0; i < result->iterations; ++i) {
     int64_t t, ticks;
     crc = 0;
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
     crc64 = 0;
 #endif
     {
@@ -142,33 +142,33 @@ void* BenchmarkThreadProc(void* lpParameter)
 	{
 	case Intrinsic8:
 	  {
-	    unsigned char* rn = (unsigned char*)result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned char);
-	    const unsigned char* const rne = (unsigned char*)rn + result->rngBufSize / sizeof(unsigned char);
+	    uint8_t* rn = (uint8_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint8_t);
+	    const uint8_t* const rne = (uint8_t*)rn + result->rngBufSize / sizeof(uint8_t);
 	    while (rn < rne)
 	      crc = _mm_crc32_u8(crc, *rn++);
 	    break;
 	  }
 	case Intrinsic16:
 	  {
-	    unsigned short* rn = (unsigned short*)result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned short);
-	    const unsigned short* const rne = (unsigned short*)rn + result->rngBufSize / sizeof(unsigned short);
+	    uint16_t* rn = (uint16_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint16_t);
+	    const uint16_t* const rne = (uint16_t*)rn + result->rngBufSize / sizeof(uint16_t);
 	    while (rn < rne)
 	      crc = _mm_crc32_u16(crc, *rn++);
 	    break;
 	  }
 	case Intrinsic32:
 	  {
-	    unsigned int* rn = result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned int);
-	    const unsigned int* const rne = rn + result->rngBufSize / sizeof(unsigned int);
+	    uint32_t* rn = result->rngBuf + result->num * result->rngBufSize / sizeof(uint32_t);
+	    const uint32_t* const rne = rn + result->rngBufSize / sizeof(uint32_t);
 	    while (rn < rne)
 	      crc = _mm_crc32_u32(crc, *rn++);
 	    break;
 	  }
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
 	case Intrinsic64:
 	  {
-	    unsigned __int64* rn = (unsigned __int64*)result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned __int64);
-	    const unsigned __int64* const rne = rn + result->rngBufSize / sizeof(unsigned __int64);
+	    uint64_t* rn = (uint64_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint64_t);
+	    const uint64_t* const rne = rn + result->rngBufSize / sizeof(uint64_t);
 	    while (rn < rne)
 	      crc64 = _mm_crc32_u64(crc64, *rn++);
 	    break;
@@ -176,7 +176,7 @@ void* BenchmarkThreadProc(void* lpParameter)
 #endif
 	case Boost:
 	  {
-	    unsigned int* rn = result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned int);
+	    uint32_t* rn = result->rngBuf + result->num * result->rngBufSize / sizeof(uint32_t);
 	    boost::crc_optimal<32U, 0x1edc6f41U, 0U, 0U, true, true> crcBoost;
 	    crcBoost.process_bytes(rn, result->rngBufSize);
 	    crc = crcBoost.checksum();
@@ -184,7 +184,7 @@ void* BenchmarkThreadProc(void* lpParameter)
 	  }
 	case DefaultFast:
 	  {
-	    unsigned char* rn = (unsigned char*)result->rngBuf + result->num * result->rngBufSize / sizeof(unsigned char);
+	    uint8_t* rn = (uint8_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint8_t);
 	    CRC32_SSE42 crc32_sse42;
 	    crc = crc32_sse42.process(rn, result->rngBufSize);
 	    break;
@@ -198,8 +198,8 @@ void* BenchmarkThreadProc(void* lpParameter)
   }
   result->t = tMin;
   result->ticks = ticksMin;
-#if defined(_M_X64)
-  result->crc = (result->method == Intrinsic64)? (unsigned int)(crc64 & 0xffffffffU) : crc;
+#if defined(_M_X64) || defined(__x86_64__)
+  result->crc = (result->method == Intrinsic64)? (uint32_t)(crc64 & 0xffffffffU) : crc;
 #else
   result->crc = crc;
 #endif
@@ -216,7 +216,7 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
   std::cout << "  " << std::setfill(' ') << std::setw(18) << strMethod << "  Generieren ...";
   int64_t t = LLONG_MAX;
   int64_t ticks = LLONG_MAX;
-#ifndef WIN32
+#if defined(__GNUC__)
   Stopwatch stopwatch(t, ticks);
 #endif
   for (int i = 0; i < numThreads; ++i) {
@@ -226,9 +226,9 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
     pResult[i].iterations = gIterations;
     pResult[i].numCores = numCores;
     pResult[i].bindToCore = gBindToCore;
-#ifdef WIN32
+#if defined(WIN32)
     pResult[i].hThread = CreateThread(NULL, 0, BenchmarkThreadProc, (LPVOID)&pResult[i], CREATE_SUSPENDED, NULL);
-#else
+#elif defined(__GNUC__)
     pthread_create(&pResult[i].hThread, NULL, BenchmarkThreadProc, (void*)&pResult[i]);
 #endif
     pResult[i].method = method;
@@ -237,21 +237,18 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
   std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
   std::cout << "Berechnen des CRC ...";
   
+#if defined(WIN32)
   {
-#ifdef WIN32
     Stopwatch stopwatch(t, ticks);
-    for (int i = 0; i < numThreads; ++i) {
+    for (int i = 0; i < numThreads; ++i)
       ResumeThread(hThread[i]);
-    }
     WaitForMultipleObjects(numThreads, hThread, TRUE, INFINITE);
-#else
-    for (int i = 0; i < numThreads; ++i) {
-      pthread_join(hThread[i], 0);
-    }
-    t = stopwatch.t();
-#endif
   }
-  std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
+#elif defined(__GNUC__)
+  for (int i = 0; i < numThreads; ++i)
+    pthread_join(hThread[i], 0);
+  stopwatch.stop();
+#endif
   
   // Ergebnisse sammeln
   CrcResult result = { numThreads, strMethod, pResult[0].crc };
@@ -261,6 +258,7 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
     tMin += pResult[i].t;
   tMin /= numThreads;
   
+  std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
   std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
   std::cout << "0x" << std::setfill('0') << std::hex << std::setw(8) << pResult[0].crc
 	    << std::setfill(' ') << std::setw(10) << std::dec << tMin << " ms  " 
@@ -318,10 +316,10 @@ void disclaimer(void) {
 
 
 int main(int argc, char* argv[]) {
-#ifdef WIN32
+#if defined(WIN32)
   gThreadPriority = GetThreadPriority(GetCurrentThread());
   SecureZeroMemory(gNumThreads+1, sizeof(gNumThreads[0]) * (MAX_NUM_THREADS-1));
-#else
+#elif defined(__GNUC__)
   bzero(gNumThreads+1, sizeof(gNumThreads[0]) * (MAX_NUM_THREADS-1));
   // TODO
 #endif
@@ -424,10 +422,10 @@ int main(int argc, char* argv[]) {
   while (rn < rne)
     gen.next(*rn++);
   
-#ifdef WIN32
+#if defined(WIN32)
   SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 #endif
-  std::cout << "Bilden der Prüfsummen (" << gIterations << "x" << (gRngBufSize/1024/1024) << " MByte) ..." << std::endl;
+  std::cout << "Bilden der Pruefsummen (" << gIterations << "x" << (gRngBufSize/1024/1024) << " MByte) ..." << std::endl;
   for (int i = 0; i <= gThreadIterations && gNumThreads[i] > 0 ; ++i) {
     const int numThreads = gNumThreads[i];
     std::cout << std::endl
@@ -439,7 +437,7 @@ int main(int argc, char* argv[]) {
       runBenchmark(numThreads, "_mm_crc32_u8", Intrinsic8);
       runBenchmark(numThreads, "_mm_crc32_u16", Intrinsic16);
       runBenchmark(numThreads, "_mm_crc32_u32", Intrinsic32);
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
       runBenchmark(numThreads, "_mm_crc32_u64", Intrinsic64);
 #endif
     }
@@ -454,7 +452,7 @@ int main(int argc, char* argv[]) {
   for (std::vector<CrcResult>::const_iterator i = gCrcResults.begin(); i != gCrcResults.end() && correct; ++i) {
     correct = (i->crc == crc);
     if (gVerbose > 1)
-      std::cout << "Prüfen des Ergebnisses von Methode '" << i->method
+      std::cout << "Pruefen des Ergebnisses von Methode '" << i->method
 		<< "' in " << i->nThreads << " Threads ..."
 		<< ((correct)? "OK" : "FEHLER") << std::endl;
   }
