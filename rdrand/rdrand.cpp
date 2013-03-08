@@ -201,8 +201,8 @@ void runBenchmark(const char* outputFilename, const int numThreads) {
     hThread[i] = pResult[i].hThread; // hThread[] wird von WaitForMultipleObjects() benötigt
   }
 
-  std::cout.setf(std::ios_base::left, std::ios_base::adjustfield)
-    << "  " << std::setfill(' ') << std::setw(18) << GEN::name() << " "
+  std::cout.setf(std::ios_base::left, std::ios_base::adjustfield);
+  std::cout << "  " << std::setfill(' ') << std::setw(18) << GEN::name() << " "
     << "Generieren ...";
 
 #if defined(WIN32)
@@ -241,8 +241,8 @@ void runBenchmark(const char* outputFilename, const int numThreads) {
   }
   tMin /= numThreads;
 
-  std::cout.setf(std::ios_base::right, std::ios_base::adjustfield)
-    << std::setfill(' ') << std::setw(5) << tMin << " ms, " 
+  std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
+  std::cout << std::setfill(' ') << std::setw(5) << tMin << " ms, " 
     << std::fixed << std::setw(8) << std::setprecision(2) << (float)gRngBufSize*gIterations/1024/1024/(1e-3*t)*numThreads << " MByte/s";
 
   if (invalidSum > 0)
