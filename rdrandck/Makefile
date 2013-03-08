@@ -1,13 +1,13 @@
 # Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
 # All rights reserved.
 
-SRC = mersenne_twister.cpp
-DEPS = circ.h marsaglia.h mcg.h mersenne_twister.h 
+SRC = rdrandck.cpp
+OUT = rdrandck
+DEPS = 
 OBJ = $(SRC:.cpp=.o)
-OUT = librng.a
 INCLUDES = -I../sharedutil
 CXX = g++
-LIBS =
+LIBS = -L../sharedutil -lsharedutil
 LDFLAGS =
 .SUFFIXES = .cpp
 
@@ -37,7 +37,7 @@ configured: $(OUT)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) -c $< -o $@
 
 $(OUT): $(OBJ)
-	ar rcs $(OUT) $(OBJ)
+	$(CXX) $(OBJ) $(LDFLAGS) $(LIBS) -o $(OUT)
 
 clean:
 	rm -f $(OBJ) $(OUT)

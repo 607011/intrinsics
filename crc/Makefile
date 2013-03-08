@@ -10,14 +10,22 @@ LDFLAGS = -s
 
 all:
 	@echo Bitte mit \"make target\" aufrufen, wobei \"target\" eine der folgenden Optionen ist:
-	@echo x86
-	@echo x64
+	@echo x86-release
+	@echo x64-release
+	@echo x86-debug
+	@echo x64-debug
 
-x86:
-	make CXXFLAGS="-Wall -O3 -m32 -fno-rtti -march=corei7 -msse4.2 -mrdrnd -mcrc32" OUT="crc" configured
+x86-release:
+	make CXXFLAGS="-Wall -O3 -m32 -fno-rtti -march=corei7 -msse4.2 -mrdrnd -mcrc32 -DNDEBUG" OUT="crc" configured
 
-x64:
-	make CXXFLAGS="-Wall -O3 -m64 -fno-rtti -march=corei7 -msse4.2 -mrdrnd -mcrc32" OUT="crc64" configured
+x64-release:
+	make CXXFLAGS="-Wall -O3 -m64 -fno-rtti -march=corei7 -msse4.2 -mrdrnd -mcrc32 -DNDEBUG" OUT="crc64" configured
+
+x86-debug:
+	make CXXFLAGS="-Wall -m32 -march=corei7 -msse4.2 -mrdrnd -mcrc32 -DDEBUG -ggdb" OUT="crc" configured
+
+x64-debug:
+	make CXXFLAGS="-Wall -m64 -march=corei7 -msse4.2 -mrdrnd -mcrc32 -DDEBUG -ggdb" OUT="crc64" configured
 
 configured: $(OUT)
 

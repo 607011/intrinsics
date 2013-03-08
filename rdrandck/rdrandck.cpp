@@ -5,6 +5,7 @@
 #include <Windows.h>
 #endif
 
+#include <stdlib.h>
 #include <iostream>
 
 #include "sharedutil.h"
