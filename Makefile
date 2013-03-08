@@ -33,3 +33,8 @@ clean:
 	for dir in $(SUBDIRS); do \
 		$(MAKE) -C $$dir clean; \
 	done
+
+mrproper:
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir mrproper; \
+	done

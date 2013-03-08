@@ -17,16 +17,16 @@ all:
 	@echo x64-debug
 
 x86-release:
-	$(MAKE) CXXFLAGS="-Wall -O2 -m64 -march=corei7 -msse4.2 -mrdrnd -mcrc32" LDFLAGS="-s" configured
+	$(MAKE) CXXFLAGS="-Wall -O2 -m32 -march=corei7 -msse4.2 -mrdrnd -mcrc32" LDFLAGS="-s" configured
 
 x64-release:
-	$(MAKE) CXXFLAGS="-Wall -O2 -march=corei7 -msse4.2 -mrdrnd -mcrc32" LDFLAGS="-s" configured
+	$(MAKE) CXXFLAGS="-Wall -O2 -m64 -march=corei7 -msse4.2 -mrdrnd -mcrc32" LDFLAGS="-s" configured
 
 x86-debug:
-	$(MAKE) CXXFLAGS="-Wall -m64 -march=corei7 -msse4.2 -mrdrnd -mcrc32 -DDEBUG -ggdb" LDFLAGS="-g" configured
+	$(MAKE) CXXFLAGS="-Wall -m32 -march=corei7 -msse4.2 -mrdrnd -mcrc32 -DDEBUG -ggdb" LDFLAGS="-g" configured
 
 x64-debug:
-	$(MAKE) CXXFLAGS="-Wall -O2 -march=corei7 -msse4.2 -mrdrnd -mcrc32 -DDEBUG -ggdb" LDFLAGS="-g" configured
+	$(MAKE) CXXFLAGS="-Wall -m64 -march=corei7 -msse4.2 -mrdrnd -mcrc32 -DDEBUG -ggdb" LDFLAGS="-g" configured
 
 configured: $(OUT)
 
