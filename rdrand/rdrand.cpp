@@ -15,7 +15,6 @@
 #include "marsaglia.h"
 #include "mcg.h"
 #include "circ.h"
-
 #include "rdrand.h"
 #include "sharedutil.h"
 #include "stopwatch.h"
@@ -52,6 +51,7 @@ enum _long_options {
   SELECT_THREADS,
   SELECT_APPEND
 };
+
 static struct option long_options[] = {
   { "append",               no_argument,       0, SELECT_APPEND },
   { "no-write",             no_argument,       0, SELECT_NO_WRITE },
@@ -193,24 +193,17 @@ void runBenchmark(const char* outputFilename, const int numThreads) {
     } 
 
 #if defined(WIN32)
-    pResult[i].hThread = CreateThread(NULL, 0,
-      BenchmarkThreadProc<GEN>,
-      (LPVOID)&pResult[i],
-      CREATE_SUSPENDED, NULL);
+    pResult[i].hThread = CreateThread(NULL, 0, BenchmarkThreadProc<GEN>, (LPVOID)&pResult[i], CREATE_SUSPENDED, NULL);
 #elif defined(__GNUC__)
-    pthread_create(&pResult[i].hThread, NULL,
-      BenchmarkThreadProc<GEN>,
-      (void*)&pResult[i]);
+    pthread_create(&pResult[i].hThread, NULL, BenchmarkThreadProc<GEN>, (void*)&pResult[i]);
 #endif
 
     hThread[i] = pResult[i].hThread; // hThread[] wird von WaitForMultipleObjects() benötigt
   }
 
-  std::cout.setf(std::ios_base::left, std::ios_base::adjustfield);
-  std::cout << "  " << std::setfill(' ') << std::setw(18) << GEN::name() << " ";
-  // Threads starten, auf Ende warten, Zeit stoppen
-
-  std::cout << "Generieren ...";
+  std::cout.setf(std::ios_base::left, std::ios_base::adjustfield)
+    << "  " << std::setfill(' ') << std::setw(18) << GEN::name() << " "
+    << "Generieren ...";
 
 #if defined(WIN32)
   {
@@ -248,8 +241,8 @@ void runBenchmark(const char* outputFilename, const int numThreads) {
   }
   tMin /= numThreads;
 
-  std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
-  std::cout << std::setfill(' ') << std::setw(5) << tMin << " ms, " 
+  std::cout.setf(std::ios_base::right, std::ios_base::adjustfield)
+    << std::setfill(' ') << std::setw(5) << tMin << " ms, " 
     << std::fixed << std::setw(8) << std::setprecision(2) << (float)gRngBufSize*gIterations/1024/1024/(1e-3*t)*numThreads << " MByte/s";
 
   if (invalidSum > 0)
@@ -273,7 +266,7 @@ void usage(void) {
     << "     Generieren N Mal wiederholen (Vorgabe: " << DEFAULT_ITERATIONS << ")" << std::endl
     << std::endl
     << "  --append" << std::endl
-    << "     Zufallszahlen an bestehende Dateien anhängen" << std::endl
+    << "     Zufallszahlen an bestehende Dateien anhaengen" << std::endl
     << std::endl
     << "  --no-write" << std::endl
     << "     Zufallszahlen nur erzeugen, nicht in Datei schreiben" << std::endl
@@ -305,7 +298,7 @@ void disclaimer(void) {
     << "Alle Rechte vorbehalten." << std::endl
     << std::endl
     << "Diese Software wurde zu Lehr- und Demonstrationszwecken erstellt." << std::endl
-    << "Alle Ausgaben ohne Gewähr." << std::endl
+    << "Alle Ausgaben ohne Gewaehr." << std::endl
     << std::endl;
 }
 
