@@ -19,9 +19,11 @@
 #include "crc32.h"
 
 #if defined(__GNUC__)
-typedef unsigned int DWORD;
-typedef pthread_t HANDLE;
 #include <strings.h>
+#include <pthread.h>
+typedef pthread_t HANDLE;
+typedef unsigned int DWORD;
+typedef void* LPVOID;
 #endif
 
 static const int DEFAULT_ITERATIONS = 16;
@@ -103,10 +105,11 @@ struct BenchmarkResult {
 
 // die im Thread laufenden Benchmark-Routine
 #if defined(WIN32)
-DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
+DWORD WINAPI
 #elif defined(__GNUC__)
-void* BenchmarkThreadProc(void* lpParameter)
+void* 
 #endif
+  BenchmarkThreadProc(LPVOID lpParameter)
 {
   BenchmarkResult* result = (BenchmarkResult*)lpParameter;
   if (result->bindToCore) {
@@ -209,7 +212,6 @@ void* BenchmarkThreadProc(void* lpParameter)
 
 
 void runBenchmark(const int numThreads, const char* strMethod, const Method method) {
-  // Threads zum Leben erwecken
   HANDLE* hThread = new HANDLE[numThreads];
   BenchmarkResult* pResult = new BenchmarkResult[numThreads];
   const DWORD numCores = getNumCores();
@@ -409,11 +411,10 @@ int main(int argc, char* argv[]) {
   try {
     gRngBuf = new uint8_t[gMaxNumThreads * gRngBufSize];
   }
-  catch(...)
-    {
-      std::cerr << "FEHLER: nicht genug freier Speicher!" << std::endl;
-      return EXIT_FAILURE;
-    }
+  catch(...) {
+    std::cerr << "FEHLER: nicht genug freier Speicher!" << std::endl;
+    return EXIT_FAILURE;
+  }
   if (gRngBuf == NULL) {
     std::cerr << "FEHLER beim Allozieren des Speichers!" << std::endl;
     return EXIT_FAILURE;
