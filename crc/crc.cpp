@@ -30,7 +30,7 @@ static const int DEFAULT_NUM_THREADS = 1;
 static const int MAX_NUM_THREADS = 256;
 
 int gIterations = DEFAULT_ITERATIONS;
-unsigned int* gRngBuf = NULL;
+uint8_t* gRngBuf = NULL;
 int gRngBufSize = DEFAULT_RNGBUF_SIZE;
 int gNumThreads[MAX_NUM_THREADS] = { DEFAULT_NUM_THREADS };
 int gMaxNumThreads = 1;
@@ -87,7 +87,7 @@ struct BenchmarkResult {
   }
   // input fields
   Method method;
-  unsigned int* rngBuf;
+  uint8_t* rngBuf;
   int rngBufSize;
   DWORD num;
   HANDLE hThread;
@@ -97,7 +97,7 @@ struct BenchmarkResult {
   // output fields
   int64_t t;
   int64_t ticks;
-  unsigned int crc;
+  uint32_t crc;
 };
 
 
@@ -111,7 +111,7 @@ void* BenchmarkThreadProc(void* lpParameter)
   BenchmarkResult* result = (BenchmarkResult*)lpParameter;
   if (result->bindToCore) {
 #if defined(WIN32)
-    DWORD affinityMask = 1 << (result->num % result->numCores);
+    DWORD_PTR affinityMask = 1 << (result->num % result->numCores);
     SetThreadAffinityMask(GetCurrentThread(), affinityMask);
 #elif defined(__GNUC__)
     cpu_set_t cpuset;
@@ -159,7 +159,7 @@ void* BenchmarkThreadProc(void* lpParameter)
 	  }
 	case Intrinsic32:
 	  {
-	    uint32_t* rn = result->rngBuf + result->num * result->rngBufSize / sizeof(uint32_t);
+	    uint32_t* rn = (uint32_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint32_t);
 	    const uint32_t* const rne = rn + result->rngBufSize / sizeof(uint32_t);
 	    while (rn < rne)
 	      crc = _mm_crc32_u32(crc, *rn++);
@@ -177,7 +177,7 @@ void* BenchmarkThreadProc(void* lpParameter)
 #endif
 	case Boost:
 	  {
-	    uint32_t* rn = result->rngBuf + result->num * result->rngBufSize / sizeof(uint32_t);
+	    uint32_t* rn = (uint32_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint32_t);
 	    boost::crc_optimal<32U, 0x1edc6f41U, 0U, 0U, true, true> crcBoost;
 	    crcBoost.process_bytes(rn, result->rngBufSize);
 	    crc = crcBoost.checksum();
@@ -407,7 +407,7 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl << "Generieren von " << gMaxNumThreads << "x" << gRngBufSize << " MByte ..." << std::endl;
   gRngBufSize *= 1024*1024;
   try {
-    gRngBuf = new uint32_t[gMaxNumThreads * gRngBufSize / sizeof(uint32_t)];
+    gRngBuf = new uint8_t[gMaxNumThreads * gRngBufSize];
   }
   catch(...)
     {
@@ -418,7 +418,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "FEHLER beim Allozieren des Speichers!" << std::endl;
     return EXIT_FAILURE;
   }
-  uint32_t* rn = gRngBuf;
+  uint32_t* rn = reinterpret_cast<uint32_t*>(gRngBuf);
   const uint32_t* const rne = rn + gMaxNumThreads * gRngBufSize / sizeof(uint32_t);
   while (rn < rne)
     gen.next(*rn++);
