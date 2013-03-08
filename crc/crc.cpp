@@ -31,6 +31,13 @@ static const int DEFAULT_RNGBUF_SIZE = 128;
 static const int DEFAULT_NUM_THREADS = 1;
 static const int MAX_NUM_THREADS = 256;
 
+enum CoreBinding {
+  NoCoreBinding,
+  LinearCoreBinding,
+  EvenFirstCoreBinding,
+  OddFirstCoreBinding
+};
+
 int gIterations = DEFAULT_ITERATIONS;
 uint8_t* gRngBuf = NULL;
 int gRngBufSize = DEFAULT_RNGBUF_SIZE;
@@ -38,7 +45,7 @@ int gNumThreads[MAX_NUM_THREADS] = { DEFAULT_NUM_THREADS };
 int gMaxNumThreads = 1;
 int gThreadIterations = 0;
 int gThreadPriority;
-bool gBindToCore = true;
+CoreBinding gCoreBinding = EvenFirstCoreBinding;
 
 struct CrcResult {
   int nThreads;
@@ -49,28 +56,28 @@ struct CrcResult {
 std::vector<CrcResult> gCrcResults;
 
 enum _long_options {
-	SELECT_HELP = 0x1,
-	SELECT_NO_BIND_TO_CORE,
-	SELECT_ITERATIONS,
-	SELECT_THREADS,
-	SELECT_APPEND};
+  SELECT_HELP = 0x1,
+  SELECT_CORE_BINDING,
+  SELECT_ITERATIONS,
+  SELECT_THREADS,
+  SELECT_APPEND};
 static struct option long_options[] = {
-	{ "no-bind-to-core",      no_argument,       0, SELECT_NO_BIND_TO_CORE },
-	{ "iterations",           required_argument, 0, SELECT_ITERATIONS },
-	{ "threads",              required_argument, 0, SELECT_THREADS },
-	{ "help",                 no_argument,       0, SELECT_HELP },
+  { "core-binding",  required_argument, 0, SELECT_CORE_BINDING },
+  { "iterations",    required_argument, 0, SELECT_ITERATIONS },
+  { "threads",       required_argument, 0, SELECT_THREADS },
+  { "help",          no_argument,       0, SELECT_HELP },
 };
 
 
 enum Method {
-	Intrinsic8,
-	Intrinsic16,
-	Intrinsic32,
+  Intrinsic8,
+  Intrinsic16,
+  Intrinsic32,
 #if defined(_M_X64) || defined(__x86_64__)
-	Intrinsic64,
+  Intrinsic64,
 #endif
-	Boost,
-	DefaultFast
+  Boost,
+  DefaultFast
 };
 
 
@@ -95,7 +102,7 @@ struct BenchmarkResult {
   HANDLE hThread;
   int iterations;
   DWORD numCores;
-  bool bindToCore;
+  CoreBinding coreBinding;
   // output fields
   int64_t t;
   int64_t ticks;
@@ -112,17 +119,44 @@ void*
   BenchmarkThreadProc(LPVOID lpParameter)
 {
   BenchmarkResult* result = (BenchmarkResult*)lpParameter;
-  if (result->bindToCore) {
 #if defined(WIN32)
-    DWORD_PTR affinityMask = 1 << (result->num % result->numCores);
+  if (result->coreBinding != NoCoreBinding) {
+    DWORD core = result->num % result->numCores;
+    switch (result->coreBinding) {
+    case OddFirstCoreBinding:
+      {
+        DWORD offset = (core >= result->numCores / 2)? 1 : 0;
+        DWORD divisor = (core >= result->numCores / 2)? 2 : 1;
+        core = 2 * core / divisor + offset;
+        break;
+      }
+    case EvenFirstCoreBinding:
+      {
+        DWORD offset = (core < result->numCores / 2)? 1 : 0;
+        DWORD divisor = (core < result->numCores / 2)? 2 : 1;
+        core = 2 * core / divisor + offset;
+        break;
+      }
+    }
+    DWORD_PTR affinityMask = 1 << core;
     SetThreadAffinityMask(GetCurrentThread(), affinityMask);
+  }
 #elif defined(__GNUC__)
+  if (result->coreBinding != NoCoreBinding) {
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
-    CPU_SET(result->num, &cpuset);
+    switch(result->coreBinding) {
+    case LinearCoreBinding:
+      CPU_SET(result->num % result->numCores, &cpuset);
+      break;
+    case OddFirstCoreBinding:
+      break;
+    case EvenFirstCoreBinding:
+      break;
+    }
     sched_setaffinity(pthread_self(), sizeof(cpu_set_t), &cpuset); 
-#endif
   }
+#endif
 #if defined(WIN32)
   SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 #elif defined(__GNUC__)
@@ -143,57 +177,57 @@ void*
     {
       Stopwatch stopwatch(t, ticks);
       switch (result->method)
-	{
-	case Intrinsic8:
-	  {
-	    uint8_t* rn = (uint8_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint8_t);
-	    const uint8_t* const rne = (uint8_t*)rn + result->rngBufSize / sizeof(uint8_t);
-	    while (rn < rne)
-	      crc = _mm_crc32_u8(crc, *rn++);
-	    break;
-	  }
-	case Intrinsic16:
-	  {
-	    uint16_t* rn = (uint16_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint16_t);
-	    const uint16_t* const rne = (uint16_t*)rn + result->rngBufSize / sizeof(uint16_t);
-	    while (rn < rne)
-	      crc = _mm_crc32_u16(crc, *rn++);
-	    break;
-	  }
-	case Intrinsic32:
-	  {
-	    uint32_t* rn = (uint32_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint32_t);
-	    const uint32_t* const rne = rn + result->rngBufSize / sizeof(uint32_t);
-	    while (rn < rne)
-	      crc = _mm_crc32_u32(crc, *rn++);
-	    break;
-	  }
+      {
+      case Intrinsic8:
+        {
+          uint8_t* rn = (uint8_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint8_t);
+          const uint8_t* const rne = (uint8_t*)rn + result->rngBufSize / sizeof(uint8_t);
+          while (rn < rne)
+            crc = _mm_crc32_u8(crc, *rn++);
+          break;
+        }
+      case Intrinsic16:
+        {
+          uint16_t* rn = (uint16_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint16_t);
+          const uint16_t* const rne = (uint16_t*)rn + result->rngBufSize / sizeof(uint16_t);
+          while (rn < rne)
+            crc = _mm_crc32_u16(crc, *rn++);
+          break;
+        }
+      case Intrinsic32:
+        {
+          uint32_t* rn = (uint32_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint32_t);
+          const uint32_t* const rne = rn + result->rngBufSize / sizeof(uint32_t);
+          while (rn < rne)
+            crc = _mm_crc32_u32(crc, *rn++);
+          break;
+        }
 #if defined(_M_X64) || defined(__x86_64__)
-	case Intrinsic64:
-	  {
-	    uint64_t* rn = (uint64_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint64_t);
-	    const uint64_t* const rne = rn + result->rngBufSize / sizeof(uint64_t);
-	    while (rn < rne)
-	      crc64 = _mm_crc32_u64(crc64, *rn++);
-	    break;
-	  }
+      case Intrinsic64:
+        {
+          uint64_t* rn = (uint64_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint64_t);
+          const uint64_t* const rne = rn + result->rngBufSize / sizeof(uint64_t);
+          while (rn < rne)
+            crc64 = _mm_crc32_u64(crc64, *rn++);
+          break;
+        }
 #endif
-	case Boost:
-	  {
-	    uint32_t* rn = (uint32_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint32_t);
-	    boost::crc_optimal<32U, 0x1edc6f41U, 0U, 0U, true, true> crcBoost;
-	    crcBoost.process_bytes(rn, result->rngBufSize);
-	    crc = crcBoost.checksum();
-	    break;
-	  }
-	case DefaultFast:
-	  {
-	    uint8_t* rn = (uint8_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint8_t);
-	    CRC32_SSE42 crc32_sse42;
-	    crc = crc32_sse42.process(rn, result->rngBufSize);
-	    break;
-	  }
-	}
+      case Boost:
+        {
+          uint32_t* rn = (uint32_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint32_t);
+          boost::crc_optimal<32U, 0x1edc6f41U, 0U, 0U, true, true> crcBoost;
+          crcBoost.process_bytes(rn, result->rngBufSize);
+          crc = crcBoost.checksum();
+          break;
+        }
+      case DefaultFast:
+        {
+          uint8_t* rn = (uint8_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint8_t);
+          CRC32_SSE42 crc32_sse42;
+          crc = crc32_sse42.process(rn, result->rngBufSize);
+          break;
+        }
+      }
     }
     if (t < tMin)
       tMin = t;
@@ -228,7 +262,7 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
     pResult[i].rngBufSize = gRngBufSize;
     pResult[i].iterations = gIterations;
     pResult[i].numCores = numCores;
-    pResult[i].bindToCore = gBindToCore;
+    pResult[i].coreBinding = gCoreBinding;
 #if defined(WIN32)
     pResult[i].hThread = CreateThread(NULL, 0, BenchmarkThreadProc, (LPVOID)&pResult[i], CREATE_SUSPENDED, NULL);
 #elif defined(__GNUC__)
@@ -239,7 +273,7 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
   }
   std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
   std::cout << "Berechnen des CRC ...";
-  
+
 #if defined(WIN32)
   {
     Stopwatch stopwatch(t, ticks);
@@ -252,7 +286,7 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
     pthread_join(hThread[i], 0);
   stopwatch.stop();
 #endif
-  
+
   // Ergebnisse sammeln
   CrcResult result = { numThreads, strMethod, pResult[0].crc };
   gCrcResults.push_back(result);
@@ -260,16 +294,16 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
   for (int i = 1; i < numThreads; ++i)
     tMin += pResult[i].t;
   tMin /= numThreads;
-  
+
   std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
   std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
   std::cout << "0x" << std::setfill('0') << std::hex << std::setw(8) << pResult[0].crc
-	    << std::setfill(' ') << std::setw(10) << std::dec << tMin << " ms  " 
-	    << std::fixed << std::setprecision(2) << std::setw(8)
-	    << (float)gRngBufSize*gIterations/1024/1024/(1e-3*t)*numThreads << " MB/s";
-  
+    << std::setfill(' ') << std::setw(10) << std::dec << tMin << " ms  " 
+    << std::fixed << std::setprecision(2) << std::setw(8)
+    << (float)gRngBufSize*gIterations/1024/1024/(1e-3*t)*numThreads << " MB/s";
+
   std::cout << std::endl;
-  
+
   delete [] pResult;
   delete [] hThread;
 }
@@ -277,44 +311,44 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
 
 void usage(void) {
   std::cout << "Aufruf: crc [Optionen]" << std::endl
-	    << std::endl
-	    << "Optionen:" << std::endl
-	    << "  -n N" << std::endl
-	    << "     N MByte große Blocks generieren (Vorgabe: " << DEFAULT_RNGBUF_SIZE << ")" << std::endl
-	    << std::endl
-	    << "  --iterations N" << std::endl
-	    << "  -i N" << std::endl
-	    << "     Generieren N Mal wiederholen (Vorgabe: " << DEFAULT_ITERATIONS << ")" << std::endl
-	    << std::endl
-	    << "  --no-bind-to-core" << std::endl
-	    << "  -0" << std::endl
-	    << "     Threads nicht Prozessorkerne binden" << std::endl
-	    << std::endl
-	    << "  --quiet" << std::endl
-	    << "  -q" << std::endl
-	    << "     Keine Informationen ausgeben" << std::endl
-	    << std::endl
-	    << "  --threads N" << std::endl
-	    << "  -t N" << std::endl
-	    << "     Zufallszahlen in N Threads parallel generieren (Vorgabe: " << DEFAULT_NUM_THREADS << ")" << std::endl
-	    << "     Mehrfachnennungen möglich." << std::endl
-	    << std::endl
-	    << "  --help" << std::endl
-	    << "  -h" << std::endl
-	    << "  -?" << std::endl
-	    << "     Diese Hilfe anzeigen" << std::endl
-	    << std::endl;
+    << std::endl
+    << "Optionen:" << std::endl
+    << "  -n N" << std::endl
+    << "     N MByte große Blocks generieren (Vorgabe: " << DEFAULT_RNGBUF_SIZE << ")" << std::endl
+    << std::endl
+    << "  --iterations N" << std::endl
+    << "  -i N" << std::endl
+    << "     Generieren N Mal wiederholen (Vorgabe: " << DEFAULT_ITERATIONS << ")" << std::endl
+    << std::endl
+    << "  --core-binding [linear|evenfirst|oddfirst|none]" << std::endl
+    << "     Modus, nach dem Threads Prozessorkerne gebunden werden" << std::endl
+    << "     (Vorgabe: evenfirst)" << std::endl
+    << std::endl
+    << "  --quiet" << std::endl
+    << "  -q" << std::endl
+    << "     Keine Informationen ausgeben" << std::endl
+    << std::endl
+    << "  --threads N" << std::endl
+    << "  -t N" << std::endl
+    << "     Zufallszahlen in N Threads parallel generieren (Vorgabe: " << DEFAULT_NUM_THREADS << ")" << std::endl
+    << "     Mehrfachnennungen möglich." << std::endl
+    << std::endl
+    << "  --help" << std::endl
+    << "  -h" << std::endl
+    << "  -?" << std::endl
+    << "     Diese Hilfe anzeigen" << std::endl
+    << std::endl;
 }
 
 
 void disclaimer(void) {
   std::cout << "crc - Experimente mit dem Maschinenbefehl CRC." << std::endl
-	    << "Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag" << std::endl
-	    << "Alle Rechte vorbehalten." << std::endl
-	    << std::endl
-	    << "Diese Software wurde zu Lehr- und Demonstrationszwecken erstellt." << std::endl
-	    << "Alle Ausgaben ohne Gewähr." << std::endl
-	    << std::endl;
+    << "Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag" << std::endl
+    << "Alle Rechte vorbehalten." << std::endl
+    << std::endl
+    << "Diese Software wurde zu Lehr- und Demonstrationszwecken erstellt." << std::endl
+    << "Alle Ausgaben ohne Gewähr." << std::endl
+    << std::endl;
 }
 
 
@@ -328,72 +362,89 @@ int main(int argc, char* argv[]) {
 #endif
   for (;;) {
     int option_index = 0;
-    int c = getopt_long(argc, argv, "vh0?n:t:i:", long_options, &option_index);
+    int c = getopt_long(argc, argv, "vh?n:t:i:", long_options, &option_index);
     if (c == -1)
       break;
     switch (c)
-      {
-      case SELECT_ITERATIONS:
-	// fall-through
-      case 'i':
-	if (optarg == NULL) {
-	  usage();
-	  return EXIT_FAILURE;
-	}
-	gIterations = atoi(optarg);
-	if (gIterations <= 0)
-	  gIterations = DEFAULT_ITERATIONS;
-	break;
-      case 'n':
-	if (optarg == NULL) {
-	  usage();
-	  return EXIT_FAILURE;
-	}
-	gRngBufSize = atoi(optarg);
-	if (gRngBufSize <= 0)
-	  gRngBufSize = DEFAULT_RNGBUF_SIZE;
-	break;
-      case SELECT_THREADS:
-	// fall-through
-      case 't':
-	if (optarg == NULL) {
-	  usage();
-	  return EXIT_FAILURE;
-	}
-	if (gThreadIterations < MAX_NUM_THREADS) {
-	  int numThreads = atoi(optarg);
-	  if (numThreads <= 0)
-	    numThreads = 1;
-	  if (numThreads > gMaxNumThreads)
-	    gMaxNumThreads = numThreads;
-	  gNumThreads[gThreadIterations++] = numThreads;
-	}
-	break;
-      case 'v':
-	++gVerbose;
-	break;
-      case 'h':
-	// fall-through
-      case '?':
-	// fall-through
-      case SELECT_HELP:
-	disclaimer();
-	usage();
-	return EXIT_SUCCESS;
-	break;
-      case '0':
-	// fall-through
-      case SELECT_NO_BIND_TO_CORE:
-	gBindToCore = false;
-	break;
-      default:
-	usage();
-	return EXIT_FAILURE;
+    {
+    case SELECT_ITERATIONS:
+      // fall-through
+    case 'i':
+      if (optarg == NULL) {
+        usage();
+        return EXIT_FAILURE;
       }
+      gIterations = atoi(optarg);
+      if (gIterations <= 0)
+        gIterations = DEFAULT_ITERATIONS;
+      break;
+    case 'n':
+      if (optarg == NULL) {
+        usage();
+        return EXIT_FAILURE;
+      }
+      gRngBufSize = atoi(optarg);
+      if (gRngBufSize <= 0)
+        gRngBufSize = DEFAULT_RNGBUF_SIZE;
+      break;
+    case SELECT_THREADS:
+      // fall-through
+    case 't':
+      if (optarg == NULL) {
+        usage();
+        return EXIT_FAILURE;
+      }
+      if (gThreadIterations < MAX_NUM_THREADS) {
+        int numThreads = atoi(optarg);
+        if (numThreads <= 0)
+          numThreads = 1;
+        if (numThreads > gMaxNumThreads)
+          gMaxNumThreads = numThreads;
+        gNumThreads[gThreadIterations++] = numThreads;
+      }
+      break;
+    case 'v':
+      ++gVerbose;
+      break;
+    case 'h':
+      // fall-through
+    case '?':
+      // fall-through
+    case SELECT_HELP:
+      disclaimer();
+      usage();
+      return EXIT_SUCCESS;
+      break;
+    case SELECT_CORE_BINDING:
+      if (optarg == NULL) {
+        usage();
+        return EXIT_FAILURE;
+      }
+      if (strcmp(optarg, "linear") == 0) {
+        gCoreBinding = LinearCoreBinding;
+      }
+      else if (strcmp(optarg, "evendfirst") == 0) {
+        gCoreBinding = EvenFirstCoreBinding;
+      }
+      else if (strcmp(optarg, "oddfirst") == 0) {
+        gCoreBinding = OddFirstCoreBinding;
+      }
+      else if (strcmp(optarg, "none") == 0) {
+        gCoreBinding = NoCoreBinding;
+      }
+      else {
+        usage();
+        return EXIT_FAILURE;
+      }
+      break;
+    default:
+      usage();
+      return EXIT_FAILURE;
+    }
   }
-  
+
   evaluateCPUFeatures();
-  
+
   if (!isCRCSupported()) {
     std::cout
       << "//////////////////////////////////////////////////////" << std::endl
@@ -401,7 +452,7 @@ int main(int argc, char* argv[]) {
       << "/// Die _mm_crc32_uxx-Benchmarks entfallen daher.  ///" << std::endl
       << "//////////////////////////////////////////////////////" << std::endl;
   }
-  
+
   // Speicherblöcke mit Zufallszahlen belegen
   MersenneTwister gen;
   gen.seed();
@@ -423,7 +474,7 @@ int main(int argc, char* argv[]) {
   const uint32_t* const rne = rn + gMaxNumThreads * gRngBufSize / sizeof(uint32_t);
   while (rn < rne)
     gen.next(*rn++);
-  
+
 #if defined(WIN32)
   SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 #endif
@@ -431,10 +482,10 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i <= gThreadIterations && gNumThreads[i] > 0 ; ++i) {
     const int numThreads = gNumThreads[i];
     std::cout << std::endl
-	      << "... in " << numThreads << " Thread" << (numThreads == 1? "" : "s") << ":" << std::endl
-	      << std::endl
-	      << "  Methode             CRC             t/Block      Durchsatz" << std::endl
-	      << "  ----------------------------------------------------------" << std::endl;
+      << "... in " << numThreads << " Thread" << (numThreads == 1? "" : "s") << ":" << std::endl
+      << std::endl
+      << "  Methode             CRC             t/Block      Durchsatz" << std::endl
+      << "  ----------------------------------------------------------" << std::endl;
     if (isCRCSupported()) {
       runBenchmark(numThreads, "_mm_crc32_u8", Intrinsic8);
       runBenchmark(numThreads, "_mm_crc32_u16", Intrinsic16);
@@ -446,7 +497,7 @@ int main(int argc, char* argv[]) {
     runBenchmark(numThreads, "boost::crc",    Boost);
     runBenchmark(numThreads, "default",       DefaultFast);
   }
-  
+
   if (gVerbose > 1) 
     std::cout << std::endl;
   bool correct = true;
@@ -455,10 +506,10 @@ int main(int argc, char* argv[]) {
     correct = (i->crc == crc);
     if (gVerbose > 1)
       std::cout << "Pruefen des Ergebnisses von Methode '" << i->method
-		<< "' in " << i->nThreads << " Threads ..."
-		<< ((correct)? "OK" : "FEHLER") << std::endl;
+      << "' in " << i->nThreads << " Threads ..."
+      << ((correct)? "OK" : "FEHLER") << std::endl;
   }
-  
+
   if (gVerbose > 0) {
     std::cout << std::endl;
     if (correct)
@@ -466,8 +517,8 @@ int main(int argc, char* argv[]) {
     else 
       std::cerr << "FEHLER: unterschiedliche CRC-Ergebnisse!" << std::endl;
   }
-  
+
   delete [] gRngBuf;
-  
+
   return (correct)? EXIT_SUCCESS : EXIT_FAILURE;
 }
