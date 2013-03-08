@@ -5,10 +5,6 @@
 #include <Windows.h>
 #endif
 
-#if defined(__GNUC__)
-#include <pthread.h>
-#endif
-
 #include <fstream>
 #include <iostream>
 #include <iomanip>
@@ -25,9 +21,11 @@
 #include "stopwatch.h"
 
 #if defined(__GNUC__)
-typedef unsigned int DWORD;
-typedef pthread_t HANDLE;
 #include <strings.h>
+#include <pthread.h>
+typedef pthread_t HANDLE;
+typedef unsigned int DWORD;
+typedef void* LPVOID;
 #endif
 
 static const int DEFAULT_ITERATIONS = 12;
@@ -99,10 +97,11 @@ struct BenchmarkResult {
 // die im Thread laufenden Benchmark-Routine
 template <class GEN>
 #if defined(WIN32)
-DWORD WINAPI BenchmarkThreadProc(LPVOID lpParameter)
+DWORD WINAPI 
 #elif defined(__GNUC__)
-void* BenchmarkThreadProc(void* lpParameter)
+void*
 #endif
+  BenchmarkThreadProc(LPVOID lpParameter)
 {
   BenchmarkResult* result = (BenchmarkResult*)lpParameter;
   if (gBindToCore) {
@@ -129,13 +128,13 @@ void* BenchmarkThreadProc(void* lpParameter)
       typename GEN::result_t* rn = (typename GEN::result_t*)result->rngBuf;
       const typename GEN::result_t* rne = rn + result->rngBufSize / GEN::result_size();
       while (rn < rne)
-	gen.next(*rn++);
+        gen.next(*rn++);
     }
     else {
       Stopwatch stopwatch(t, ticks);
       int i = result->rngBufSize / GEN::result_size();
       while (--i)
-	gen();
+        gen();
     }
     if (t < tMin)
       tMin = t;
@@ -155,8 +154,8 @@ void runBenchmark(const char* outputFilename, const int numThreads) {
   std::ofstream fs;
   if (outputFilename != NULL && gDoWrite) {
     fs.open(outputFilename, gDoAppend
-	    ? (std::ios::binary | std::ios::out | std::ios::app | std::ios::ate)
-	    : (std::ios::binary | std::ios::out));
+      ? (std::ios::binary | std::ios::out | std::ios::app | std::ios::ate)
+      : (std::ios::binary | std::ios::out));
     if (!fs.is_open() || fs.fail()) {
       std::cerr << "FEHLER: Öffnen von " << outputFilename << " fehlgeschlagen." << std::endl;
       exit(EXIT_FAILURE);
@@ -168,7 +167,7 @@ void runBenchmark(const char* outputFilename, const int numThreads) {
 #if defined(__GNUC__)
   Stopwatch stopwatch(t, ticks);
 #endif
-  
+
   // Threads zum Leben erwecken
   HANDLE* hThread = new HANDLE[numThreads];
   BenchmarkResult* pResult = new BenchmarkResult[numThreads];
@@ -182,7 +181,7 @@ void runBenchmark(const char* outputFilename, const int numThreads) {
     pResult[i].writeToMemory = gDoWriteToMemory;
     try {
       if (gDoWriteToMemory)
-	pResult[i].rngBuf = new uint8_t[gRngBufSize];
+        pResult[i].rngBuf = new uint8_t[gRngBufSize];
     }
     catch (...) {
       std::cerr << "FEHLER: nicht genug freier Speicher!" << std::endl;
@@ -192,20 +191,21 @@ void runBenchmark(const char* outputFilename, const int numThreads) {
       std::cerr << "FEHLER beim Allozieren des Speichers!" << std::endl;
       exit(EXIT_FAILURE);
     } 
-    hThread[i] = pResult[i].hThread; // hThread[] wird von WaitForMultipleObjects() benötigt
 
 #if defined(WIN32)
     pResult[i].hThread = CreateThread(NULL, 0,
-				      BenchmarkThreadProc<GEN>,
-				      (LPVOID)&pResult[i],
-				      CREATE_SUSPENDED, NULL);
+      BenchmarkThreadProc<GEN>,
+      (LPVOID)&pResult[i],
+      CREATE_SUSPENDED, NULL);
 #elif defined(__GNUC__)
     pthread_create(&pResult[i].hThread, NULL,
-		   BenchmarkThreadProc<GEN>,
-		   (void*)&pResult[i]);
+      BenchmarkThreadProc<GEN>,
+      (void*)&pResult[i]);
 #endif
+
+    hThread[i] = pResult[i].hThread; // hThread[] wird von WaitForMultipleObjects() benötigt
   }
-  
+
   std::cout.setf(std::ios_base::left, std::ios_base::adjustfield);
   std::cout << "  " << std::setfill(' ') << std::setw(18) << GEN::name() << " ";
   // Threads starten, auf Ende warten, Zeit stoppen
@@ -225,18 +225,18 @@ void runBenchmark(const char* outputFilename, const int numThreads) {
   stopwatch.stop();
 #endif
   std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
-  
+
   // ggf. Zufallszahlenbuffer in Datei schreiben
   if (fs.is_open()) {
     for (int i = 0; i < numThreads; ++i) {
       std::cout << "Schreiben ..." << std::flush;
       if (pResult[i].rngBuf != NULL)
-	fs.write((const char*)pResult[i].rngBuf, gRngBufSize);
+        fs.write((const char*)pResult[i].rngBuf, gRngBufSize);
       std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b";
     }
     fs.close();
   }
-  
+
   // Ergebnisse sammeln
   int64_t tMin = 0;
   int64_t invalidSum = 0;
@@ -247,15 +247,15 @@ void runBenchmark(const char* outputFilename, const int numThreads) {
     exceededSum += pResult[i].exceeded;
   }
   tMin /= numThreads;
-  
+
   std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
   std::cout << std::setfill(' ') << std::setw(5) << tMin << " ms, " 
-	    << std::fixed << std::setw(8) << std::setprecision(2) << (float)gRngBufSize*gIterations/1024/1024/(1e-3*t)*numThreads << " MByte/s";
-  
+    << std::fixed << std::setw(8) << std::setprecision(2) << (float)gRngBufSize*gIterations/1024/1024/(1e-3*t)*numThreads << " MByte/s";
+
   if (invalidSum > 0)
     std::cout << "(invalid: " << invalidSum << ", exceeded: " << exceededSum << ")";
   std::cout << std::endl;
-  
+
   delete [] pResult;
   delete [] hThread;
 }
@@ -263,50 +263,50 @@ void runBenchmark(const char* outputFilename, const int numThreads) {
 
 void usage(void) {
   std::cout << "Aufruf: rdrand.exe [Optionen]" << std::endl
-	    << std::endl
-	    << "Optionen:" << std::endl
-	    << "  -n N" << std::endl
-	    << "     N MByte Zufallsbytes generieren (Vorgabe: " << DEFAULT_RNGBUF_SIZE << ")" << std::endl
-	    << std::endl
-	    << "  --iterations N" << std::endl
-	    << "  -i N" << std::endl
-	    << "     Generieren N Mal wiederholen (Vorgabe: " << DEFAULT_ITERATIONS << ")" << std::endl
-	    << std::endl
-	    << "  --append" << std::endl
-	    << "     Zufallszahlen an bestehende Dateien anhängen" << std::endl
-	    << std::endl
-	    << "  --no-write" << std::endl
-	    << "     Zufallszahlen nur erzeugen, nicht in Datei schreiben" << std::endl
-	    << std::endl
-	    << "  --no-write-to-memory" << std::endl
-	    << "     Zufallszahlen nur erzeugen, nicht in Speicher ablegen" << std::endl
-	    << "     (impliziert --no-write)" << std::endl
-	    << std::endl
-	    << "  --quiet" << std::endl
-	    << "  -q" << std::endl
-	    << "     Keine Informationen ausgeben" << std::endl
-	    << std::endl
-	    << "  --threads N" << std::endl
-	    << "  -t N" << std::endl
-	    << "     Zufallszahlen in N Threads parallel generieren (Vorgabe: " << DEFAULT_NUM_THREADS << ")" << std::endl
-	    << "     Mehrfachnennungen möglich." << std::endl
-	    << std::endl
-	    << "  --help" << std::endl
-	    << "  -h" << std::endl
-	    << "  -?" << std::endl
-	    << "     Diese Hilfe anzeigen" << std::endl
-	    << std::endl;
+    << std::endl
+    << "Optionen:" << std::endl
+    << "  -n N" << std::endl
+    << "     N MByte Zufallsbytes generieren (Vorgabe: " << DEFAULT_RNGBUF_SIZE << ")" << std::endl
+    << std::endl
+    << "  --iterations N" << std::endl
+    << "  -i N" << std::endl
+    << "     Generieren N Mal wiederholen (Vorgabe: " << DEFAULT_ITERATIONS << ")" << std::endl
+    << std::endl
+    << "  --append" << std::endl
+    << "     Zufallszahlen an bestehende Dateien anhängen" << std::endl
+    << std::endl
+    << "  --no-write" << std::endl
+    << "     Zufallszahlen nur erzeugen, nicht in Datei schreiben" << std::endl
+    << std::endl
+    << "  --no-write-to-memory" << std::endl
+    << "     Zufallszahlen nur erzeugen, nicht in Speicher ablegen" << std::endl
+    << "     (impliziert --no-write)" << std::endl
+    << std::endl
+    << "  --quiet" << std::endl
+    << "  -q" << std::endl
+    << "     Keine Informationen ausgeben" << std::endl
+    << std::endl
+    << "  --threads N" << std::endl
+    << "  -t N" << std::endl
+    << "     Zufallszahlen in N Threads parallel generieren (Vorgabe: " << DEFAULT_NUM_THREADS << ")" << std::endl
+    << "     Mehrfachnennungen möglich." << std::endl
+    << std::endl
+    << "  --help" << std::endl
+    << "  -h" << std::endl
+    << "  -?" << std::endl
+    << "     Diese Hilfe anzeigen" << std::endl
+    << std::endl;
 }
 
 
 void disclaimer(void) {
   std::cout << "rdrand - Experimente mit (Pseudo-)Zufallszahlengeneratoren." << std::endl
-	    << "Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag" << std::endl
-	    << "Alle Rechte vorbehalten." << std::endl
-	    << std::endl
-	    << "Diese Software wurde zu Lehr- und Demonstrationszwecken erstellt." << std::endl
-	    << "Alle Ausgaben ohne Gewähr." << std::endl
-	    << std::endl;
+    << "Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag" << std::endl
+    << "Alle Rechte vorbehalten." << std::endl
+    << std::endl
+    << "Diese Software wurde zu Lehr- und Demonstrationszwecken erstellt." << std::endl
+    << "Alle Ausgaben ohne Gewähr." << std::endl
+    << std::endl;
 }
 
 
@@ -323,106 +323,106 @@ int main(int argc, char* argv[]) {
     if (c == -1)
       break;
     switch (c)
-      {
-      case SELECT_ITERATIONS:
-	// fall-through
-      case 'i':
-	if (optarg == NULL) {
-	  usage();
-	  exit(EXIT_FAILURE);
-	}
-	gIterations = atoi(optarg);
-	if (gIterations <= 0)
-	  gIterations = DEFAULT_ITERATIONS;
-	break;
-      case 'n':
-	if (optarg == NULL) {
-	  usage();
-	  exit(EXIT_FAILURE);
-	}
-	gRngBufSize = atoi(optarg);
-	if (gRngBufSize <= 0)
-	  gRngBufSize = DEFAULT_RNGBUF_SIZE;
-	break;
-      case SELECT_NO_WRITE_TO_MEM:
-	gDoWriteToMemory = false;
-	break;
-      case SELECT_THREADS:
-	// fall-through
-      case 't':
-	if (optarg == NULL) {
-	  usage();
-	  exit(EXIT_FAILURE);
-	}
-	if (gThreadIterations < MAX_NUM_THREADS) {
-	  int numThreads = atoi(optarg);
-	  if (numThreads <= 0)
-	    numThreads = 1;
-	  gNumThreads[gThreadIterations++] = numThreads;
-	}
-	break;
-      case SELECT_APPEND:
-	gDoAppend = true;
-	break;
-      case 'v':
-	++gVerbose;
-	break;
-      case 'h':
-	// fall-through
-      case '?':
-	// fall-through
-      case SELECT_HELP:
-	disclaimer();
-	usage();
-	return EXIT_SUCCESS;
-	break;
-      case SELECT_NO_WRITE:
-	gDoWrite = false;
-	break;
-      case SELECT_NO_BIND_TO_CORE:
-	gBindToCore = false;
-	break;
-      default:
-	usage();
-	return EXIT_FAILURE;
+    {
+    case SELECT_ITERATIONS:
+      // fall-through
+    case 'i':
+      if (optarg == NULL) {
+        usage();
+        exit(EXIT_FAILURE);
       }
+      gIterations = atoi(optarg);
+      if (gIterations <= 0)
+        gIterations = DEFAULT_ITERATIONS;
+      break;
+    case 'n':
+      if (optarg == NULL) {
+        usage();
+        exit(EXIT_FAILURE);
+      }
+      gRngBufSize = atoi(optarg);
+      if (gRngBufSize <= 0)
+        gRngBufSize = DEFAULT_RNGBUF_SIZE;
+      break;
+    case SELECT_NO_WRITE_TO_MEM:
+      gDoWriteToMemory = false;
+      break;
+    case SELECT_THREADS:
+      // fall-through
+    case 't':
+      if (optarg == NULL) {
+        usage();
+        exit(EXIT_FAILURE);
+      }
+      if (gThreadIterations < MAX_NUM_THREADS) {
+        int numThreads = atoi(optarg);
+        if (numThreads <= 0)
+          numThreads = 1;
+        gNumThreads[gThreadIterations++] = numThreads;
+      }
+      break;
+    case SELECT_APPEND:
+      gDoAppend = true;
+      break;
+    case 'v':
+      ++gVerbose;
+      break;
+    case 'h':
+      // fall-through
+    case '?':
+      // fall-through
+    case SELECT_HELP:
+      disclaimer();
+      usage();
+      return EXIT_SUCCESS;
+      break;
+    case SELECT_NO_WRITE:
+      gDoWrite = false;
+      break;
+    case SELECT_NO_BIND_TO_CORE:
+      gBindToCore = false;
+      break;
+    default:
+      usage();
+      return EXIT_FAILURE;
+    }
   }
-  
+
   if (!gDoWriteToMemory)
     gDoWrite = false;
-  
+
   evaluateCPUFeatures();
-  
+
   if (!isRdRandSupported()) {
     std::cout
-      << "/////////////////////////////////////////////////////////" << std::endl
-      << "/// Die CPU unterstützt die RDRAND-Instruktion nicht. ///" << std::endl
-      << "/// Die _rdrandxx_step-Benchmarks entfallen daher.    ///" << std::endl
-      << "/////////////////////////////////////////////////////////" << std::endl;
+      << "//////////////////////////////////////////////////////////" << std::endl
+      << "/// Die CPU unterstuetzt die RDRAND-Instruktion nicht. ///" << std::endl
+      << "/// Die _rdrandxx_step-Benchmarks entfallen daher.     ///" << std::endl
+      << "//////////////////////////////////////////////////////////" << std::endl;
   }
-  
+
   if (gVerbose > 0)
     std::cout << std::endl << "Generieren von " << gIterations << "x" << gRngBufSize << " MByte ..." << std::endl;
   gRngBufSize *= 1024*1024;
-  
+
 #if defined(WIN32)
   SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 #endif
-  
+
   for (int i = 0; i <= gThreadIterations && gNumThreads[i] > 0 ; ++i) {
     const int numThreads = gNumThreads[i];
     if (gVerbose > 0)
       std::cout << std::endl << "... in " << numThreads << " Thread" << (numThreads == 1? "" : "s") << ":" << std::endl;
-    
+
     runBenchmark<DummyByteGenerator>(NULL, numThreads);
     // runBenchmark<DummyUIntGenerator>(NULL, numThreads);
-    
+
     // software PRNG benchmarks
     // runBenchmark<CircularBytes>("circular.dat", numThreads);
     runBenchmark<MultiplyWithCarry>("mwc.dat", numThreads);
     runBenchmark<MCG>("mcg.dat", numThreads);
     runBenchmark<MersenneTwister>("mt.dat", numThreads);
-    
+
     // Ivy Bridge RNG benchmarks
     if (isRdRandSupported()) {
       runBenchmark<RdRand16>("rdrand16.dat", numThreads);
@@ -431,8 +431,8 @@ int main(int argc, char* argv[]) {
       runBenchmark<RdRand64>("rdrand64.dat", numThreads);
 #endif
     }
-    
+
   }
-  
+
   return EXIT_SUCCESS;
 }
