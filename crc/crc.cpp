@@ -159,11 +159,19 @@ void*
     SetThreadAffinityMask(GetCurrentThread(), affinityMask);
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 #elif defined(__GNUC__)
+    // set CPU affinity
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
     CPU_SET(core, &cpuset);
-    sched_setaffinity(pthread_self(), sizeof(cpu_set_t), &cpuset);
     pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+    // set priority
+    pthread_attr_t tattr;
+    pthread_attr_init(&tattr);
+    int policy = 0;
+    pthread_attr_getschedpolicy(&tattr, &policy);
+    int maxprio = sched_get_priority_max(policy);
+    pthread_setschedprio(pthread_self(), maxprio);
+    pthread_attr_destroy(&tattr);
 #endif
   }
 
