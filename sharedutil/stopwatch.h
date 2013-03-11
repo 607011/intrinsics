@@ -10,10 +10,27 @@
 #endif
 
 #if defined(__GNUC__)
-inline volatile long long __rdtsc(void) {
-  register long long TSC asm("eax");
-  asm volatile (".byte 15, 49" : : : "eax", "edx");
-  return TSC;
+inline volatile uint64_t __rdtsc(void) {
+  uint32_t lo, hi;
+  asm volatile ("CPUID\n"
+		"RDTSC\n"
+		"mov %%edx, %0\n"
+		"mov %%eax, %1\n"
+		: "=r" (hi), "=r" (lo)
+		:
+		: "%rax", "%rbx", "%rcx", "%rdx");
+  return (uint64_t)hi << 32 | lo;
+}
+inline volatile uint64_t __rdtscp(void) {
+  uint32_t lo, hi;
+  asm volatile ("RDTSC\n"
+		"mov %%edx, %0\n"
+		"mov %%eax, %1\n"
+		"CPUID\n"
+		: "=r" (hi), "=r" (lo)
+		:
+		: "%rax", "%rbx", "%rcx", "%rdx");
+  return (uint64_t)hi << 32 | lo;
 }
 #include <time.h>
 #include <inttypes.h>
@@ -48,7 +65,7 @@ class Stopwatch {
 
   inline void stop(void)
   {
-    mTicks = (int64_t)__rdtsc() - mTicks0;
+    mTicks = (int64_t)__rdtscp() - mTicks0;
 #ifdef WIN32
     LARGE_INTEGER pc, freq;
     QueryPerformanceCounter(&pc);

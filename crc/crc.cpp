@@ -19,10 +19,13 @@
 #include "crc32.h"
 
 #if defined(__GNUC__)
+#include <string.h>
 #include <strings.h>
+#include <sched.h>
 #include <pthread.h>
 typedef pthread_t HANDLE;
-typedef unsigned int DWORD;
+typedef uint32_t DWORD;
+typedef uint64_t DWORD64;
 typedef void* LPVOID;
 #endif
 
@@ -45,7 +48,7 @@ int gNumThreads[MAX_NUM_THREADS] = { DEFAULT_NUM_THREADS };
 int gMaxNumThreads = 1;
 int gThreadIterations = 0;
 int gThreadPriority;
-CoreBinding gCoreBinding = EvenFirstCoreBinding;
+CoreBinding gCoreBinding = LinearCoreBinding;
 
 struct CrcResult {
   int nThreads;
@@ -87,7 +90,6 @@ struct BenchmarkResult {
     , hThread(0)
     , t(0)
     , ticks(0)
-    , cycles(0)
   { /* ... */ }
   ~BenchmarkResult() {
 #ifdef WIN32
@@ -107,17 +109,8 @@ struct BenchmarkResult {
   // output fields
   int64_t t;
   int64_t ticks;
-  int64_t cycles;
   uint32_t crc;
 };
-
-
-#define cycleCheck(tsc, FUN) \
-  unsigned int c = 0x4c11db7; \
-  uint64_t tsc0 = __rdtsc(); \
-  FUN(c, 0xaaU); \
-  tsc = __rdtsc(); \
-  tsc -= tsc0;
 
 
 // die im Thread laufenden Benchmark-Routine
@@ -129,7 +122,6 @@ void*
   BenchmarkThreadProc(LPVOID lpParameter)
 {
   BenchmarkResult* result = (BenchmarkResult*)lpParameter;
-#if defined(WIN32)
   if (result->coreBinding != NoCoreBinding) {
     DWORD core = result->num % result->numCores;
     switch (result->coreBinding) {
@@ -147,31 +139,26 @@ void*
         core = 2 * core / divisor + offset;
         break;
       }
+    case LinearCoreBinding:
+      // fall-through
+    case NoCoreBinding:
+      // fall-through
+    default:
+      break;
     }
+#if defined(WIN32)
     DWORD_PTR affinityMask = 1 << core;
     SetThreadAffinityMask(GetCurrentThread(), affinityMask);
-  }
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 #elif defined(__GNUC__)
-  if (result->coreBinding != NoCoreBinding) {
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
-    switch(result->coreBinding) {
-    case LinearCoreBinding:
-      CPU_SET(result->num % result->numCores, &cpuset);
-      break;
-    case OddFirstCoreBinding:
-      break;
-    case EvenFirstCoreBinding:
-      break;
-    }
-    sched_setaffinity(pthread_self(), sizeof(cpu_set_t), &cpuset); 
+    CPU_SET(core, &cpuset);
+    sched_setaffinity(pthread_self(), sizeof(cpu_set_t), &cpuset);
+    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+#endif
   }
-#endif
-#if defined(WIN32)
-  SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
-#elif defined(__GNUC__)
-  // TODO
-#endif
+
   int64_t tMin = LLONG_MAX;
   int64_t ticksMin = LLONG_MAX;
   uint32_t crc = 0;
@@ -194,7 +181,6 @@ void*
           const uint8_t* const rne = (uint8_t*)rn + result->rngBufSize / sizeof(uint8_t);
           while (rn < rne)
             crc = _mm_crc32_u8(crc, *rn++);
-          cycleCheck(result->cycles, _mm_crc32_u8);
           break;
         }
       case Intrinsic16:
@@ -203,7 +189,6 @@ void*
           const uint16_t* const rne = (uint16_t*)rn + result->rngBufSize / sizeof(uint16_t);
           while (rn < rne)
             crc = _mm_crc32_u16(crc, *rn++);
-          cycleCheck(result->cycles, _mm_crc32_u16);
           break;
         }
       case Intrinsic32:
@@ -212,7 +197,6 @@ void*
           const uint32_t* const rne = rn + result->rngBufSize / sizeof(uint32_t);
           while (rn < rne)
             crc = _mm_crc32_u32(crc, *rn++);
-          cycleCheck(result->cycles, _mm_crc32_u32);
           break;
         }
 #if defined(_M_X64) || defined(__x86_64__)
@@ -222,7 +206,6 @@ void*
           const uint64_t* const rne = rn + result->rngBufSize / sizeof(uint64_t);
           while (rn < rne)
             crc64 = _mm_crc32_u64(crc64, *rn++);
-          cycleCheck(result->cycles, _mm_crc32_u64);
           break;
         }
 #endif
@@ -315,7 +298,8 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
     << std::setfill(' ') << std::setw(10) << std::dec << tMin << " ms  " 
     << std::fixed << std::setprecision(2) << std::setw(8)
     << (float)gRngBufSize*gIterations/1024/1024/(1e-3*t)*numThreads << " MB/s"
-    << std::setw(4) << pResult[0].cycles << std::endl;
+    << std::setw(8) << (float)pResult[0].ticks / gRngBufSize
+    << std::endl;
 
   delete [] pResult;
   delete [] hThread;
@@ -497,8 +481,8 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl
       << "... in " << numThreads << " Thread" << (numThreads == 1? "" : "s") << ":" << std::endl
       << std::endl
-      << "  Methode             CRC             t/Block      Durchsatz" << std::endl
-      << "  ----------------------------------------------------------" << std::endl;
+      << "  Methode             CRC             t/Block      Durchsatz  Zyklen" << std::endl
+      << "  ------------------------------------------------------------------" << std::endl;
     if (isCRCSupported()) {
       runBenchmark(numThreads, "_mm_crc32_u8", Intrinsic8);
       runBenchmark(numThreads, "_mm_crc32_u16", Intrinsic16);
