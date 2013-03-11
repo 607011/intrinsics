@@ -87,6 +87,7 @@ struct BenchmarkResult {
     , hThread(0)
     , t(0)
     , ticks(0)
+    , cycles(0)
   { /* ... */ }
   ~BenchmarkResult() {
 #ifdef WIN32
@@ -106,8 +107,17 @@ struct BenchmarkResult {
   // output fields
   int64_t t;
   int64_t ticks;
+  int64_t cycles;
   uint32_t crc;
 };
+
+
+#define cycleCheck(tsc, FUN) \
+  unsigned int c = 0x4c11db7; \
+  uint64_t tsc0 = __rdtsc(); \
+  FUN(c, 0xaaU); \
+  tsc = __rdtsc(); \
+  tsc -= tsc0;
 
 
 // die im Thread laufenden Benchmark-Routine
@@ -184,6 +194,7 @@ void*
           const uint8_t* const rne = (uint8_t*)rn + result->rngBufSize / sizeof(uint8_t);
           while (rn < rne)
             crc = _mm_crc32_u8(crc, *rn++);
+          cycleCheck(result->cycles, _mm_crc32_u8);
           break;
         }
       case Intrinsic16:
@@ -192,6 +203,7 @@ void*
           const uint16_t* const rne = (uint16_t*)rn + result->rngBufSize / sizeof(uint16_t);
           while (rn < rne)
             crc = _mm_crc32_u16(crc, *rn++);
+          cycleCheck(result->cycles, _mm_crc32_u16);
           break;
         }
       case Intrinsic32:
@@ -200,6 +212,7 @@ void*
           const uint32_t* const rne = rn + result->rngBufSize / sizeof(uint32_t);
           while (rn < rne)
             crc = _mm_crc32_u32(crc, *rn++);
+          cycleCheck(result->cycles, _mm_crc32_u32);
           break;
         }
 #if defined(_M_X64) || defined(__x86_64__)
@@ -209,6 +222,7 @@ void*
           const uint64_t* const rne = rn + result->rngBufSize / sizeof(uint64_t);
           while (rn < rne)
             crc64 = _mm_crc32_u64(crc64, *rn++);
+          cycleCheck(result->cycles, _mm_crc32_u64);
           break;
         }
 #endif
@@ -300,9 +314,8 @@ void runBenchmark(const int numThreads, const char* strMethod, const Method meth
   std::cout << "0x" << std::setfill('0') << std::hex << std::setw(8) << pResult[0].crc
     << std::setfill(' ') << std::setw(10) << std::dec << tMin << " ms  " 
     << std::fixed << std::setprecision(2) << std::setw(8)
-    << (float)gRngBufSize*gIterations/1024/1024/(1e-3*t)*numThreads << " MB/s";
-
-  std::cout << std::endl;
+    << (float)gRngBufSize*gIterations/1024/1024/(1e-3*t)*numThreads << " MB/s"
+    << std::setw(4) << pResult[0].cycles << std::endl;
 
   delete [] pResult;
   delete [] hThread;
