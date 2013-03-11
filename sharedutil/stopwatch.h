@@ -23,7 +23,7 @@ inline volatile uint64_t __rdtsc(void) {
 }
 inline volatile uint64_t __rdtscp(void) {
   uint32_t lo, hi;
-  asm volatile ("RDTSC\n"
+  asm volatile ("RDTSCP\n"
 		"mov %%edx, %0\n"
 		"mov %%eax, %1\n"
 		"CPUID\n"

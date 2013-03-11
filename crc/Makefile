@@ -3,8 +3,8 @@
 SRC = crc.cpp
 OBJ = $(SRC:.cpp=.o)
 CXX = g++
-INCLUDES = -I../sharedutil -I../rng
-LIBS = -L../sharedutil -L../rng -lsharedutil -lrng -lrt -lpthread
+INCLUDES = -I../sharedutil -I../rng -Icrcutil-fast
+LIBS = -L../sharedutil -L../rng -lsharedutil -lrng -lrt -lpthread -Lcrcutil-fast -lcrcfast64
 LDFLAGS = -s
 .SUFFIXES = .cpp
 

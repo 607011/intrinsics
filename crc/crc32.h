@@ -59,20 +59,6 @@ protected:
   uint32_t mBits[256];
 };
 
-#ifndef WIN32
-inline uint32_t _mm_crc32_u8(uint32_t v, uint8_t c) {
-  return __builtin_ia32_crc32qi(v, c);
-}
-inline uint32_t _mm_crc32_u16(uint32_t v, uint16_t c) {
-  return __builtin_ia32_crc32hi(v, c);
-}
-inline uint32_t _mm_crc32_u32(uint32_t v, uint32_t c) {
-  return __builtin_ia32_crc32si(v, c);
-}
-inline uint64_t _mm_crc32_u64(uint32_t v, uint64_t c) {
-  return __builtin_ia32_crc32di(v, c);
-}
-#endif
 
 typedef CRC32<0U, 0x1edc6f41U, true> CRC32C;
 typedef CRC32C CRC32_SSE42;

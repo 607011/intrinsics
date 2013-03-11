@@ -29,6 +29,14 @@ typedef uint64_t DWORD64;
 typedef void* LPVOID;
 #endif
 
+#if defined(__GNUC__)
+#include <smmintrin.h>
+#include "crcutil-fast/crc32c_sse4.h"
+#include "crcutil-fast/generic_crc.h"
+#include "crcutil-fast/protected_crc.h"
+#include "crcutil-fast/rolling_crc.h"
+#endif
+
 static const int DEFAULT_ITERATIONS = 16;
 static const int DEFAULT_RNGBUF_SIZE = 128;
 static const int DEFAULT_NUM_THREADS = 1;
@@ -63,14 +71,14 @@ enum _long_options {
   SELECT_CORE_BINDING,
   SELECT_ITERATIONS,
   SELECT_THREADS,
-  SELECT_APPEND};
+  SELECT_APPEND
+};
 static struct option long_options[] = {
   { "core-binding",  required_argument, 0, SELECT_CORE_BINDING },
   { "iterations",    required_argument, 0, SELECT_ITERATIONS },
   { "threads",       required_argument, 0, SELECT_THREADS },
   { "help",          no_argument,       0, SELECT_HELP },
 };
-
 
 enum Method {
   Intrinsic8,
@@ -82,7 +90,6 @@ enum Method {
   Boost,
   DefaultFast
 };
-
 
 struct BenchmarkResult {
   BenchmarkResult()
@@ -144,6 +151,7 @@ void*
     case NoCoreBinding:
       // fall-through
     default:
+      // ignore
       break;
     }
 #if defined(WIN32)
