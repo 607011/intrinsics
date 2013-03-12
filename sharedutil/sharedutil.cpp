@@ -19,6 +19,7 @@
 
 int gVerbose = 0;
 
+
 #ifdef WIN32
 bool hasRand_s(void) 
 {
@@ -28,35 +29,51 @@ bool hasRand_s(void)
 }
 #endif
 
+
 int getNumCores(void)
 {
 #ifdef WIN32
   SYSTEM_INFO pInfo;
   GetSystemInfo(&pInfo);
-  return (unsigned int)pInfo.dwNumberOfProcessors;
+  return (int)pInfo.dwNumberOfProcessors;
 #else
-  return sysconf( _SC_NPROCESSORS_ONLN );
+  return sysconf(_SC_NPROCESSORS_ONLN);
 #endif
 }
 
+
+typedef union {
+    uint32_t reg[4];
+    struct {
+      uint32_t eax, ebx, ecx, edx;
+    };
+} cpuid_result_t;
+  
 
 std::string cpuVendor(void) {
-  char vendor[12];
+  union {
+    char str[12];
+    struct {
+      uint32_t reg[3];
+    };
+  } vendor;
 #if defined(WIN32)
-  int cpureg[4] = { 0x0, 0x0, 0x0, 0x0 };
-  __cpuid(cpureg, 0);
-  ((unsigned int*)vendor)[0] = cpureg[1]; // EBX
-  ((unsigned int*)vendor)[1] = cpureg[3]; // EDX
-  ((unsigned int*)vendor)[2] = cpureg[2]; // ECX
+  cpuid_result_t r;
+  __cpuid(r.reg, 0);
+  vendor.reg[0] = r.ebx;
+  vendor.reg[1] = r.edx;
+  vendor.reg[2] = r.ecx;
 #else
-  unsigned int eax, ebx, ecx, edx;
+  unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
   __get_cpuid(0, &eax, &ebx, &ecx, &edx);
-  ((unsigned int*)vendor)[0] = ebx;
-  ((unsigned int*)vendor)[1] = edx;
-  ((unsigned int*)vendor)[2] = ecx;
+  vendor.reg[0] = ebx;
+  vendor.reg[1] = edx;
+  vendor.reg[2] = ecx;
 #endif
-  return std::string(vendor, 12);
+  return std::string(vendor.str, 12);
 }
+
+
 
 
 bool isGenuineIntelCPU(void) {
@@ -69,13 +86,14 @@ bool isAuthenticAMDCPU(void) {
 }
 
 
+
 bool isCRCSupported(void) {
 #ifdef WIN32
   int cpureg[4] = { 0x0, 0x0, 0x0, 0x0 };
   __cpuid(cpureg, 1);
   return (cpureg[2] & (1<<20)) != 0;
 #else
-  uint32_t eax, ebx, ecx = 0, edx;
+  uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
   __get_cpuid(1, &eax, &ebx, &ecx, &edx);
   return (ecx & (1<<20)) != 0;
 #endif
@@ -90,7 +108,7 @@ bool isRdRandSupported(void) {
   __cpuid(cpureg, 1);
   return (cpureg[2] & (1<<30)) != 0;
 #else
-  uint32_t eax, ebx, ecx = 0, edx;
+  uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
   __get_cpuid(1, &eax, &ebx, &ecx, &edx);
   return (ecx & (1<<30)) != 0;
 #endif
@@ -105,7 +123,7 @@ int clFlushLineSize(void) {
   __cpuid(cpureg, 1);
   return 8 * ((cpureg[1] >> 8) & 0xff);
 #else
-  uint32_t eax, ebx, ecx = 0, edx;
+  uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
   __get_cpuid(1, &eax, &ebx, &ecx, &edx);
   return 8 * ((ebx >> 16) & 0xff);
 #endif
@@ -134,57 +152,56 @@ void evaluateCPUFeatures(void) {
   extern int gVerbose;
   static const char* B[2] = { "false", "true" };
   int cores = -1;
+  int threads_per_package = -1;
 #ifdef WIN32
-  int cpureg[4] = { 0x0, 0x0, 0x0, 0x0 };
-  __cpuid(cpureg, 1);
-  // EAX
-  int cpu_type = (cpureg[0] >> 12) & 0x3;
-  int cpu_family = (cpureg[0] >> 8) & 0xf;
-  int cpu_ext_family = (cpureg[0] >> 20) & 0xff;
-  int cpu_model = (cpureg[0] >> 4) & 0xf;
-  int cpu_ext_model = (cpureg[0] >> 16) & 0xf;
-  int cpu_stepping = cpureg[0] & 0xf;
+  cpuid_result_t r;
+  __cpuid(r.reg, 1);
+  int cpu_type = (r.eax >> 12) & 0x3;
+  int cpu_family = (r.eax >> 8) & 0xf;
+  int cpu_ext_family = (r.eax >> 20) & 0xff;
+  int cpu_model = (r.eax >> 4) & 0xf;
+  int cpu_ext_model = (r.eax >> 16) & 0xf;
+  int cpu_stepping = r.eax & 0xf;
   // EBX
-  int logicalCores = (cpureg[1] >> 16) & 0xff;
+  int logicalCores = (r.ebx >> 16) & 0xff;
   // ECX
-  bool sse3_supported = (cpureg[2] & (1<<0)) != 0;
-  bool ssse3_supported = (cpureg[2] & (1<<9)) != 0;
-  bool monitor_wait_supported = (cpureg[2] & (1<<3)) != 0;
-  bool vmx_supported = (cpureg[2] & (1<<5)) != 0;
-  bool sse41_supported = (cpureg[2] & (1<<19)) != 0;
-  bool sse42_supported = (cpureg[2] & (1<<20)) != 0;
-  bool fma_supported = (cpureg[2] & (1<<12)) != 0;
-  bool popcnt_supported = (cpureg[2] & (1<<23)) != 0;
-  bool aes_supported = (cpureg[2] & (1<<25)) != 0;
-  bool avx_supported = (cpureg[2] & (1<<28)) != 0;
-  bool f16c_supported = (cpureg[2] & (1<<29)) != 0;
-  bool rdrand_supported = (cpureg[2] & (1<<30)) != 0;
-  bool b31_supported = (cpureg[2] & (1<<31)) != 0;
+  bool sse3_supported = (r.ecx & (1<<0)) != 0;
+  bool ssse3_supported = (r.ecx & (1<<9)) != 0;
+  bool monitor_wait_supported = (r.ecx & (1<<3)) != 0;
+  bool vmx_supported = (r.ecx & (1<<5)) != 0;
+  bool sse41_supported = (r.ecx & (1<<19)) != 0;
+  bool sse42_supported = (r.ecx & (1<<20)) != 0;
+  bool fma_supported = (r.ecx & (1<<12)) != 0;
+  bool popcnt_supported = (r.ecx & (1<<23)) != 0;
+  bool aes_supported = (r.ecx & (1<<25)) != 0;
+  bool avx_supported = (r.ecx & (1<<28)) != 0;
+  bool f16c_supported = (r.ecx & (1<<29)) != 0;
+  bool rdrand_supported = (r.ecx & (1<<30)) != 0;
+  bool b31_supported = (r.ecx & (1<<31)) != 0;
   // EDX
-  bool mmx_supported = (cpureg[3] & (1<<23)) != 0;
-  bool sse_supported = (cpureg[3] & (1<<25)) != 0;
-  bool sse2_supported = (cpureg[3] & (1<<26)) != 0;
-  bool ht_supported = (cpureg[3] & (1<<28)) != 0;
+  bool mmx_supported = (r.edx & (1<<23)) != 0;
+  bool sse_supported = (r.edx & (1<<25)) != 0;
+  bool sse2_supported = (r.edx & (1<<26)) != 0;
+  bool ht_supported = (r.edx & (1<<28)) != 0;
   if (isGenuineIntelCPU()) {
-    // Get DCP cache info
-    __cpuid(cpureg, 4);
-    cores = ((cpureg[0] >> 26) & 0x3f) + 1; // EAX[31:26] + 1
-
+    __cpuid(r.reg, 4);
+    cores = ((r.eax >> 26) & 0x3f) + 1; // EAX[31:26] + 1
+    threads_per_package = ((r.eax >> 14) & 0xfff) + 1;
   }
   else if (isAuthenticAMDCPU()) {
-    // Get NC: Number of CPU cores - 1
-    __cpuid(cpureg, 0x80000008);
-    cores = ((unsigned int)(cpureg[2] & 0xff)) + 1; // ECX[7:0] + 1
+    __cpuid(r.reg, 0x80000008);
+    cores = ((unsigned int)(r.ecx & 0xff)) + 1; // ECX[7:0] + 1
   }
 #else
-  uint32_t eax, ebx, ecx = 0, edx;
+  uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
   __get_cpuid(1, &eax, &ebx, &ecx, &edx);
-  int cpu_type = (eax] >> 12) & 0x3;
-  int cpu_family = (eax] >> 8) & 0xf;
+  int cpu_type = (eax >> 12) & 0x3;
+  int cpu_family = (eax >> 8) & 0xf;
   int cpu_ext_family = (eax >> 20) & 0xff;
   int cpu_model = (eax >> 4) & 0xf;
   int cpu_ext_model = (eax >> 16) & 0xf;
   int cpu_stepping = eax & 0xf;
+  int logicalCores = (ebx >> 16) & 0xff;
   bool sse3_supported = (ecx & (1<<0)) != 0;
   bool ssse3_supported = (ecx & (1<<9)) != 0;
   bool monitor_wait_supported = (ecx & (1<<3)) != 0;
@@ -197,24 +214,33 @@ void evaluateCPUFeatures(void) {
   bool avx_supported = (ecx & (1<<28)) != 0;
   bool f16c_supported = (ecx & (1<<29)) != 0;
   bool rdrand_supported = (ecx & (1<<30)) != 0;
-  bool b31_supported = (ecx & (1<<31)) != 0;
   bool mmx_supported = (edx & (1<<23)) != 0;
   bool sse_supported = (edx & (1<<25)) != 0;
   bool sse2_supported = (edx & (1<<26)) != 0;
   bool ht_supported = (edx & (1<<28)) != 0;
+  if (isGenuineIntelCPU()) {
+    __get_cpuid(4, &eax, &ebx, &ecx, &edx);
+    cores = ((eax >> 26) & 0x3f) + 1;
+    threads_per_package = ((eax >> 14) & 0xfff) + 1;
+  }
+  else if (isAuthenticAMDCPU()) {
+    __get_cpuid(0x80000008, &eax, &ebx, &ecx, &edx);
+    cores = ((unsigned int)(ecx & 0xff)) + 1;
+  }
 #endif
   if (gVerbose > 1) {
     std::cout << ">>> CPU vendor       : " << cpuVendor() << std::endl;
     std::cout << ">>> #cores           : " << getNumCores() << std::endl;
     std::cout << ">>> #logical cores   : " << logicalCores << std::endl;
     std::cout << ">>> #cores           : " << cores << std::endl;
+    std::cout << ">>> #threads per pkg : " << threads_per_package << std::endl;
+    std::cout << ">>> Hyper-Threading  : " << B[ht_supported] << std::endl;
     std::cout << ">>> CPU type         : " << cpu_type << std::endl;
     std::cout << ">>> CPU family       : " << cpu_family << std::endl;
     std::cout << ">>> CPU ext family   : " << cpu_ext_family << std::endl;
     std::cout << ">>> CPU model        : " << cpu_model << std::endl;
     std::cout << ">>> CPU ext model    : " << cpu_ext_model << std::endl;
     std::cout << ">>> CPU stepping     : " << cpu_stepping << std::endl;
-    std::cout << ">>> Hyper-Threading  : " << B[ht_supported] << std::endl;
     std::cout << ">>> CLFLUSH line size: " << clFlushLineSize() << std::endl;
     std::cout << ">>> MMX              : " << B[mmx_supported] << std::endl;
     std::cout << ">>> SSE              : " << B[sse_supported] << std::endl;
