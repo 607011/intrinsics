@@ -60,7 +60,9 @@ T AbstractRandomNumberGenerator<T>::makeSeed(void)
     seed = (T)GetTickCount();
   }
 #elif defined(__GNUC__)
-  seed = (T)clock();
+  struct timespec t;
+  clock_gettime(CLOCK_MONOTONIC, &t);
+  seed = (T)(t.tv_sec * 1000000 + t.tv_nsec);
 #endif
   return seed;
 }

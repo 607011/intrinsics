@@ -244,8 +244,8 @@ void*
         }
       case Crc32cSSE4:
         {
-          crcutil::Crc32cSSE4 crc32;
-          crc = (uint32_t)crc32.CrcDefault((uint8_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint8_t), result->rngBufSize, 0);
+          crcutil::Crc32cSSE4 crc32(false);
+          crc = (uint32_t)crc32.CrcDefault((uint8_t*)result->rngBuf + result->num * result->rngBufSize, result->rngBufSize, 0U);
           break;
         }
       }
