@@ -60,6 +60,7 @@ int gMaxNumThreads = 1;
 int gThreadIterations = 0;
 int gThreadPriority;
 int gNumSockets = 1;
+int gVerbose = 0;
 CoreBinding gCoreBinding = AutomaticCoreBinding;
 
 struct CrcResult {

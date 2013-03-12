@@ -15,8 +15,6 @@
 #include <inttypes.h>
 #endif
 
-extern int gVerbose;
-
 extern "C" {
 #if defined(WIN32)
   extern bool hasRand_s(void);

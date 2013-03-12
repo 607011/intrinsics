@@ -15,8 +15,6 @@
 #include <iostream>
 #include <iomanip>
 
-int gVerbose = 0;
-
 #ifdef WIN32
 bool hasRand_s(void) 
 {

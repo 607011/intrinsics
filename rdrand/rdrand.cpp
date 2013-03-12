@@ -41,6 +41,7 @@ bool gBindToCore = true;
 bool gDoAppend = false;
 bool gDoWrite = true;
 bool gDoWriteToMemory = true;
+int gVerbose = 0;
 CPUFeatures gCPU;
 
 enum _long_options {
