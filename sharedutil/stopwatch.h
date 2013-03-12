@@ -1,4 +1,5 @@
 // Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
+// All rights reserved.
 
 #ifndef __INTRINSICS_STOPWATCH_H_
 #define __INTRINSICS_STOPWATCH_H_
@@ -12,8 +13,9 @@
 #if defined(__GNUC__)
 inline volatile uint64_t __rdtsc(void) {
   uint32_t lo, hi;
-  asm volatile ("CPUID\n"
-		"RDTSC\n"
+  asm volatile (
+    "cpuid\n"
+		"rdtsc\n"
 		"mov %%edx, %0\n"
 		"mov %%eax, %1\n"
 		: "=r" (hi), "=r" (lo)
@@ -23,10 +25,11 @@ inline volatile uint64_t __rdtsc(void) {
 }
 inline volatile uint64_t __rdtscp(void) {
   uint32_t lo, hi;
-  asm volatile ("RDTSCP\n"
+  asm volatile (
+    "rdtscp\n"
 		"mov %%edx, %0\n"
 		"mov %%eax, %1\n"
-		"CPUID\n"
+		"cpuid\n"
 		: "=r" (hi), "=r" (lo)
 		:
 		: "%rax", "%rbx", "%rcx", "%rdx");
@@ -65,7 +68,7 @@ class Stopwatch {
 
   inline void stop(void)
   {
-    mTicks = (int64_t)__rdtscp() - mTicks0;
+    mTicks = (int64_t)__rdtsc() - mTicks0;
 #ifdef WIN32
     LARGE_INTEGER pc, freq;
     QueryPerformanceCounter(&pc);

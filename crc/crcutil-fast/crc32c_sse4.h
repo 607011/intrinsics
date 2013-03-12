@@ -137,7 +137,7 @@ class Crc32cSSE4 {
 
   // Returns fixed generating polymonial the class implements.
   static Crc FixedGeneratingPolynomial() {
-    return 0x82f63b78;
+    return 0x82f63b78; // 0x1edc6f41
   }
 
   // Returns degree of fixed generating polymonial the class implements.

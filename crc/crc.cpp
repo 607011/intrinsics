@@ -18,6 +18,11 @@
 #include "sharedutil.h"
 #include "crc32.h"
 
+#include "crcutil-fast/crc32c_sse4.h"
+#include "crcutil-fast/generic_crc.h"
+#include "crcutil-fast/protected_crc.h"
+#include "crcutil-fast/rolling_crc.h"
+
 #if defined(__GNUC__)
 #include <string.h>
 #include <strings.h>
@@ -31,10 +36,6 @@ typedef void* LPVOID;
 
 #if defined(__GNUC__)
 #include <smmintrin.h>
-#include "crcutil-fast/crc32c_sse4.h"
-#include "crcutil-fast/generic_crc.h"
-#include "crcutil-fast/protected_crc.h"
-#include "crcutil-fast/rolling_crc.h"
 #endif
 
 static const int DEFAULT_ITERATIONS = 16;
@@ -88,7 +89,8 @@ enum Method {
   Intrinsic64,
 #endif
   Boost,
-  DefaultFast
+  DefaultFast,
+  Crc32cSSE4,
 };
 
 struct BenchmarkResult {
@@ -236,8 +238,14 @@ void*
       case DefaultFast:
         {
           uint8_t* rn = (uint8_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint8_t);
-          CRC32_SSE42 crc32_sse42;
-          crc = crc32_sse42.process(rn, result->rngBufSize);
+          CRC32C crc32c;
+          crc = crc32c.process(rn, result->rngBufSize);
+          break;
+        }
+      case Crc32cSSE4:
+        {
+          crcutil::Crc32cSSE4 crc32;
+          crc = (uint32_t)crc32.CrcDefault((uint8_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint8_t), result->rngBufSize, 0);
           break;
         }
       }
@@ -509,6 +517,7 @@ int main(int argc, char* argv[]) {
     }
     runBenchmark(numThreads, "boost::crc",    Boost);
     runBenchmark(numThreads, "default",       DefaultFast);
+    runBenchmark(numThreads, "Crc32cSSE4",    Crc32cSSE4);
   }
 
   if (gVerbose > 1) 

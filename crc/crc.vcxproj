@@ -88,7 +88,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;CRCUTIL_USE_MM_CRC32;HAVE_I386;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -102,7 +102,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;CRCUTIL_USE_MM_CRC32;HAVE_AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -118,7 +118,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;CRCUTIL_USE_MM_CRC32;HAVE_I386;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -139,7 +139,7 @@
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;CRCUTIL_USE_MM_CRC32;HAVE_AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -152,11 +152,17 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <PostBuildEvent>
-      <Command>rem copy $(TargetDir)$(TargetFileName) "P:\crc\crc64.exe"</Command>
+      <Command>copy $(TargetDir)$(TargetFileName) "P:\crc\crc64.exe"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="crc.cpp" />
+    <ClCompile Include="crcutil-fast\crc32c_sse4.cpp" />
+    <ClCompile Include="crcutil-fast\multiword_128_64_gcc_amd64_sse2.cpp" />
+    <ClCompile Include="crcutil-fast\multiword_64_64_cl_i386_mmx.cpp" />
+    <ClCompile Include="crcutil-fast\multiword_64_64_gcc_amd64_asm.cpp" />
+    <ClCompile Include="crcutil-fast\multiword_64_64_gcc_i386_mmx.cpp" />
+    <ClCompile Include="crcutil-fast\multiword_64_64_intrinsic_i386_mmx.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\getopt\getopt.vcxproj">
@@ -171,6 +177,17 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="crc32.h" />
+    <ClInclude Include="crcutil-fast\base_types.h" />
+    <ClInclude Include="crcutil-fast\crc32c_sse4.h" />
+    <ClInclude Include="crcutil-fast\crc32c_sse4_intrin.h" />
+    <ClInclude Include="crcutil-fast\crc_casts.h" />
+    <ClInclude Include="crcutil-fast\generic_crc.h" />
+    <ClInclude Include="crcutil-fast\gf_util.h" />
+    <ClInclude Include="crcutil-fast\platform.h" />
+    <ClInclude Include="crcutil-fast\protected_crc.h" />
+    <ClInclude Include="crcutil-fast\rolling_crc.h" />
+    <ClInclude Include="crcutil-fast\std_headers.h" />
+    <ClInclude Include="crcutil-fast\uint128_sse2.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
