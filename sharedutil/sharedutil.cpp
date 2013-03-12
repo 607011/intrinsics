@@ -28,7 +28,7 @@ bool hasRand_s(void)
 }
 #endif
 
-unsigned int getNumCores(void)
+int getNumCores(void)
 {
 #ifdef WIN32
   SYSTEM_INFO pInfo;

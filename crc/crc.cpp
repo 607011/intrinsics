@@ -57,7 +57,7 @@ int gNumThreads[MAX_NUM_THREADS] = { DEFAULT_NUM_THREADS };
 int gMaxNumThreads = 1;
 int gThreadIterations = 0;
 int gThreadPriority;
-CoreBinding gCoreBinding = LinearCoreBinding;
+CoreBinding gCoreBinding = EvenFirstCoreBinding;
 
 struct CrcResult {
   int nThreads;
@@ -110,10 +110,10 @@ struct BenchmarkResult {
   Method method;
   uint8_t* rngBuf;
   int rngBufSize;
-  DWORD num;
+  int num;
   HANDLE hThread;
   int iterations;
-  DWORD numCores;
+  int numCores;
   CoreBinding coreBinding;
   // output fields
   int64_t t;
@@ -132,20 +132,16 @@ void*
 {
   BenchmarkResult* result = (BenchmarkResult*)lpParameter;
   if (result->coreBinding != NoCoreBinding) {
-    DWORD core = result->num % result->numCores;
+    int core = result->num % result->numCores;
     switch (result->coreBinding) {
-    case OddFirstCoreBinding:
-      {
-        DWORD offset = (core >= result->numCores / 2)? 1 : 0;
-        DWORD divisor = (core >= result->numCores / 2)? 2 : 1;
-        core = 2 * core / divisor + offset;
-        break;
-      }
     case EvenFirstCoreBinding:
       {
-        DWORD offset = (core < result->numCores / 2)? 1 : 0;
-        DWORD divisor = (core < result->numCores / 2)? 2 : 1;
-        core = 2 * core / divisor + offset;
+        core = 2 * core + ((core < result->numCores / 2)? 0 : 1 - result->numCores);
+        break;
+      }
+    case OddFirstCoreBinding:
+      {
+        core = 2 * core + ((core < result->numCores / 2)? 1 : -result->numCores);
         break;
       }
     case LinearCoreBinding:
@@ -157,7 +153,7 @@ void*
       break;
     }
 #if defined(WIN32)
-    DWORD_PTR affinityMask = 1 << core;
+    DWORD_PTR affinityMask = 1 << (DWORD)core;
     SetThreadAffinityMask(GetCurrentThread(), affinityMask);
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 #elif defined(__GNUC__)
@@ -266,10 +262,10 @@ void*
 }
 
 
-void runBenchmark(const int numThreads, const char* strMethod, const Method method) {
+void runBenchmark(int numThreads, const char* strMethod, const Method method) {
   HANDLE* hThread = new HANDLE[numThreads];
   BenchmarkResult* pResult = new BenchmarkResult[numThreads];
-  const DWORD numCores = getNumCores();
+  int numCores = getNumCores();
   std::cout.setf(std::ios_base::left, std::ios_base::adjustfield);
   std::cout << "  " << std::setfill(' ') << std::setw(18) << strMethod << "  Generieren ...";
   int64_t t = LLONG_MAX;
@@ -337,26 +333,21 @@ void usage(void) {
     << "  -n N" << std::endl
     << "     N MByte große Blocks generieren (Vorgabe: " << DEFAULT_RNGBUF_SIZE << ")" << std::endl
     << std::endl
-    << "  --iterations N" << std::endl
-    << "  -i N" << std::endl
+    << "  (--iterations|-i) N" << std::endl
     << "     Generieren N Mal wiederholen (Vorgabe: " << DEFAULT_ITERATIONS << ")" << std::endl
     << std::endl
-    << "  --core-binding [linear|evenfirst|oddfirst|none]" << std::endl
+    << "  (--core-binding|-b) [linear|evenfirst|oddfirst|none]" << std::endl
     << "     Modus, nach dem Threads Prozessorkerne gebunden werden" << std::endl
     << "     (Vorgabe: evenfirst)" << std::endl
     << std::endl
-    << "  --quiet" << std::endl
-    << "  -q" << std::endl
+    << "  (--quiet|-q)" << std::endl
     << "     Keine Informationen ausgeben" << std::endl
     << std::endl
-    << "  --threads N" << std::endl
-    << "  -t N" << std::endl
+    << "  (--threads|-t) N" << std::endl
     << "     Zufallszahlen in N Threads parallel generieren (Vorgabe: " << DEFAULT_NUM_THREADS << ")" << std::endl
     << "     Mehrfachnennungen möglich." << std::endl
     << std::endl
-    << "  --help" << std::endl
-    << "  -h" << std::endl
-    << "  -?" << std::endl
+    << "  (--help|-h|-?)" << std::endl
     << "     Diese Hilfe anzeigen" << std::endl
     << std::endl;
 }
@@ -383,7 +374,7 @@ int main(int argc, char* argv[]) {
 #endif
   for (;;) {
     int option_index = 0;
-    int c = getopt_long(argc, argv, "vh?n:t:i:", long_options, &option_index);
+    int c = getopt_long(argc, argv, "vh?n:t:i:b:", long_options, &option_index);
     if (c == -1)
       break;
     switch (c)
@@ -437,6 +428,8 @@ int main(int argc, char* argv[]) {
       return EXIT_SUCCESS;
       break;
     case SELECT_CORE_BINDING:
+      // fall-through
+    case 'b':
       if (optarg == NULL) {
         usage();
         return EXIT_FAILURE;

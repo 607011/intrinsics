@@ -25,7 +25,7 @@ extern unsigned int getRdRand32(void);
 extern unsigned long long getRdRand64(void);
 #endif
 extern void evaluateCPUFeatures(void);
-extern unsigned int getNumCores(void);
+extern int getNumCores(void);
 
 #if defined(__GNUC__)
 inline  unsigned int _rdrand8_step(uint8_t* x) {
