@@ -234,7 +234,6 @@ void*
         }
       case DefaultNaive:
         {
-          //uint32_t* rn = (uint32_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint32_t);
           uint8_t* rn = (uint8_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint8_t);
           CRC32Naive<0U, 0x1edc6f41U, true> crc32c;
           crc = crc32c.process(rn, result->rngBufSize);
