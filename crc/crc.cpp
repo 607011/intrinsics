@@ -444,7 +444,7 @@ int main(int argc, char* argv[]) {
       if (strcmp(optarg, "linear") == 0) {
         gCoreBinding = LinearCoreBinding;
       }
-      else if (strcmp(optarg, "evendfirst") == 0) {
+      else if (strcmp(optarg, "evenfirst") == 0) {
         gCoreBinding = EvenFirstCoreBinding;
       }
       else if (strcmp(optarg, "oddfirst") == 0) {
