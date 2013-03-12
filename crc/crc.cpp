@@ -89,7 +89,8 @@ enum Method {
   Intrinsic64,
 #endif
   Boost,
-  DefaultFast,
+  DefaultNaive,
+  DefaultOptimized,
   Crc32cSSE4,
 };
 
@@ -231,10 +232,18 @@ void*
           crc = crcBoost.checksum();
           break;
         }
-      case DefaultFast:
+      case DefaultNaive:
+        {
+          //uint32_t* rn = (uint32_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint32_t);
+          uint8_t* rn = (uint8_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint8_t);
+          CRC32Naive<0U, 0x1edc6f41U, true> crc32c;
+          crc = crc32c.process(rn, result->rngBufSize);
+          break;
+        }
+      case DefaultOptimized:
         {
           uint8_t* rn = (uint8_t*)result->rngBuf + result->num * result->rngBufSize / sizeof(uint8_t);
-          CRC32C crc32c;
+          CRC32Optimized<0U, 0x1edc6f41U, true> crc32c;
           crc = crc32c.process(rn, result->rngBufSize);
           break;
         }
@@ -508,8 +517,9 @@ int main(int argc, char* argv[]) {
       runBenchmark(numThreads, "_mm_crc32_u64", Intrinsic64);
 #endif
     }
-    runBenchmark(numThreads, "boost::crc",    Boost);
-    runBenchmark(numThreads, "default",       DefaultFast);
+    runBenchmark(numThreads, "boost::crc", Boost);
+    runBenchmark(numThreads, "default naive", DefaultNaive);
+    runBenchmark(numThreads, "default optimized", DefaultOptimized);
     runBenchmark(numThreads, "Crc32cSSE4",    Crc32cSSE4);
   }
 
