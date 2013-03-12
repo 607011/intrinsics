@@ -47,9 +47,11 @@ enum CoreBinding {
   NoCoreBinding,
   LinearCoreBinding,
   EvenFirstCoreBinding,
-  OddFirstCoreBinding
+  OddFirstCoreBinding,
+  AutomaticCoreBinding
 };
 
+CPUFeatures gCPU;
 int gIterations = DEFAULT_ITERATIONS;
 uint8_t* gRngBuf = NULL;
 int gRngBufSize = DEFAULT_RNGBUF_SIZE;
@@ -58,7 +60,7 @@ int gMaxNumThreads = 1;
 int gThreadIterations = 0;
 int gThreadPriority;
 int gNumSockets = 1;
-CoreBinding gCoreBinding = EvenFirstCoreBinding;
+CoreBinding gCoreBinding = AutomaticCoreBinding;
 
 struct CrcResult {
   int nThreads;
@@ -275,7 +277,7 @@ void*
 void runBenchmark(int numThreads, const char* strMethod, const Method method) {
   HANDLE* hThread = new HANDLE[numThreads];
   BenchmarkResult* pResult = new BenchmarkResult[numThreads];
-  int numCores = getNumCores();
+  int numCores = gCPU.getNumCores();
   std::cout.setf(std::ios_base::left, std::ios_base::adjustfield);
   std::cout << "  " << std::setfill(' ') << std::setw(18) << strMethod << "  Generieren ...";
   int64_t t = LLONG_MAX;
@@ -346,9 +348,9 @@ void usage(void) {
     << "  (--iterations|-i) N" << std::endl
     << "     Generieren N Mal wiederholen (Vorgabe: " << DEFAULT_ITERATIONS << ")" << std::endl
     << std::endl
-    << "  (--core-binding|-b) (linear|evenfirst|oddfirst|none)" << std::endl
+    << "  (--core-binding|-b) (linear|evenfirst|oddfirst|none|auto)" << std::endl
     << "     Modus, nach dem Threads Prozessorkerne gebunden werden" << std::endl
-    << "     (Vorgabe: evenfirst)" << std::endl
+    << "     (Vorgabe: auto)" << std::endl
     << std::endl
     << "  (--quiet|-q)" << std::endl
     << "     Keine Informationen ausgeben" << std::endl
@@ -467,6 +469,9 @@ int main(int argc, char* argv[]) {
       else if (strcmp(optarg, "none") == 0) {
         gCoreBinding = NoCoreBinding;
       }
+      else if (strcmp(optarg, "auto") == 0) {
+		  gCoreBinding = AutomaticCoreBinding;
+      }
       else {
         usage();
         return EXIT_FAILURE;
@@ -478,9 +483,42 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  evaluateCPUFeatures();
+    if (gVerbose > 1) {
+      static const char* B[2] = { "false", "true" };
+      std::cout << ">>> CPU vendor       : " << gCPU.cpuVendor() << std::endl;
+      std::cout << ">>> #cores           : " << gCPU.getNumCores() << std::endl;
+      std::cout << ">>> #logical cores   : " << gCPU.logical_cores << std::endl;
+      std::cout << ">>> #cores           : " << gCPU.cores << std::endl;
+      std::cout << ">>> #threads per pkg : " << gCPU.threads_per_package << std::endl;
+      std::cout << ">>> Hyper-Threading  : " << B[gCPU.ht_supported] << std::endl;
+      std::cout << ">>> CPU type         : " << gCPU.cpu_type << std::endl;
+      std::cout << ">>> CPU family       : " << gCPU.cpu_family << std::endl;
+      std::cout << ">>> CPU ext family   : " << gCPU.cpu_ext_family << std::endl;
+      std::cout << ">>> CPU model        : " << gCPU.cpu_model << std::endl;
+      std::cout << ">>> CPU ext model    : " << gCPU.cpu_ext_model << std::endl;
+      std::cout << ">>> CPU stepping     : " << gCPU.cpu_stepping << std::endl;
+      std::cout << ">>> CLFLUSH line size: " << gCPU.clflush_linesize << std::endl;
+      std::cout << ">>> MMX              : " << B[gCPU.mmx_supported] << std::endl;
+      std::cout << ">>> SSE              : " << B[gCPU.sse_supported] << std::endl;
+      std::cout << ">>> SSE2             : " << B[gCPU.sse2_supported] << std::endl;
+      std::cout << ">>> SSE3             : " << B[gCPU.sse3_supported] << std::endl;
+      std::cout << ">>> SSSE3            : " << B[gCPU.ssse3_supported] << std::endl;
+      std::cout << ">>> SSE4.1           : " << B[gCPU.sse41_supported] << std::endl;
+      std::cout << ">>> SSE4.2           : " << B[gCPU.sse42_supported] << std::endl;
+      std::cout << ">>> FMA              : " << B[gCPU.fma_supported] << std::endl;
+      std::cout << ">>> MONITOR/WAIT     : " << B[gCPU.monitor_wait_supported] << std::endl;
+      std::cout << ">>> VMX              : " << B[gCPU.vmx_supported] << std::endl;
+      std::cout << ">>> F16C             : " << B[gCPU.f16c_supported] << std::endl;
+      std::cout << ">>> AVX              : " << B[gCPU.avx_supported] << std::endl;
+      std::cout << ">>> POPCNT           : " << B[gCPU.popcnt_supported] << std::endl;
+      std::cout << ">>> RDRAND           : " << B[gCPU.rdrand_supported] << std::endl;
+      std::cout << ">>> AES              : " << B[gCPU.aes_supported] << std::endl;
+    }
 
-  if (!isCRCSupported()) {
+  if (gCoreBinding == AutomaticCoreBinding) {
+  }
+
+  if (!gCPU.isCRCSupported()) {
     std::cout
       << "//////////////////////////////////////////////////////" << std::endl
       << "/// Die CPU unterstützt die CRC-Instruktion nicht. ///" << std::endl
@@ -521,7 +559,7 @@ int main(int argc, char* argv[]) {
       << std::endl
       << "  Methode             CRC             t/Block      Durchsatz  Zyklen" << std::endl
       << "  ------------------------------------------------------------------" << std::endl;
-    if (isCRCSupported()) {
+    if (gCPU.isCRCSupported()) {
       runBenchmark(numThreads, "_mm_crc32_u8", Intrinsic8);
       runBenchmark(numThreads, "_mm_crc32_u16", Intrinsic16);
       runBenchmark(numThreads, "_mm_crc32_u32", Intrinsic32);

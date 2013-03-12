@@ -12,7 +12,8 @@
 
 int main(int argc, char* argv[])
 {
-  const bool supported = isRdRandSupported();
+  CPUFeatures cpuFeatures;
+  const bool supported = cpuFeatures.isRdRandSupported();
   const char* msg = supported? "Der Prozessor unterstuetzt RDRAND.\n" : "Der Prozessor unterstuetzt RDRAND *nicht*.\n";
   std::cout <<  msg << std::endl;
   return supported? EXIT_SUCCESS : EXIT_FAILURE;

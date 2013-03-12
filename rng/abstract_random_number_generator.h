@@ -17,6 +17,7 @@
 
 #include "sharedutil.h"
 
+
 template <typename T>
 class AbstractRandomNumberGenerator
 {
@@ -45,7 +46,12 @@ public:
 protected:
   uint64_t mInvalid;
   uint64_t mLimitExceeded;
+  static CPUFeatures mCPU;
 };
+
+
+template <typename T>
+CPUFeatures AbstractRandomNumberGenerator<T>::mCPU;
 
 
 template <typename T>
@@ -53,8 +59,8 @@ T AbstractRandomNumberGenerator<T>::makeSeed(void)
 {
   T seed = 0;
 #if defined(WIN32)
-  if (isRdRandSupported()) {
-    seed = (T)getRdRand32();
+  if (mCPU.isRdRandSupported()) {
+    seed = (T)mCPU.getRdRand32();
   }
   else { 
     seed = (T)GetTickCount();

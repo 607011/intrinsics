@@ -41,6 +41,7 @@ bool gBindToCore = true;
 bool gDoAppend = false;
 bool gDoWrite = true;
 bool gDoWriteToMemory = true;
+CPUFeatures gCPU;
 
 enum _long_options {
   SELECT_HELP = 0x1,
@@ -171,7 +172,7 @@ void runBenchmark(const char* outputFilename, const int numThreads) {
   // Threads zum Leben erwecken
   HANDLE* hThread = new HANDLE[numThreads];
   BenchmarkResult* pResult = new BenchmarkResult[numThreads];
-  const DWORD numCores = getNumCores();
+  const DWORD numCores = gCPU.getNumCores();
   for (int i = 0; i < numThreads; ++i) {
     pResult[i].num = i;
     pResult[i].rngBufSize = gRngBufSize;
@@ -384,9 +385,7 @@ int main(int argc, char* argv[]) {
   if (!gDoWriteToMemory)
     gDoWrite = false;
 
-  evaluateCPUFeatures();
-
-  if (!isRdRandSupported()) {
+  if (!gCPU.isRdRandSupported()) {
     std::cout
       << "//////////////////////////////////////////////////////////" << std::endl
       << "/// Die CPU unterstuetzt die RDRAND-Instruktion nicht. ///" << std::endl
@@ -417,7 +416,7 @@ int main(int argc, char* argv[]) {
     runBenchmark<MersenneTwister>("mt.dat", numThreads);
 
     // Ivy Bridge RNG benchmarks
-    if (isRdRandSupported()) {
+    if (gCPU.isRdRandSupported()) {
       runBenchmark<RdRand16>("rdrand16.dat", numThreads);
       runBenchmark<RdRand32>("rdrand32.dat", numThreads);
 #if defined(_M_X64) || defined(__x86_64__)
