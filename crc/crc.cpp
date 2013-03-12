@@ -57,6 +57,7 @@ int gNumThreads[MAX_NUM_THREADS] = { DEFAULT_NUM_THREADS };
 int gMaxNumThreads = 1;
 int gThreadIterations = 0;
 int gThreadPriority;
+int gNumSockets = 1;
 CoreBinding gCoreBinding = EvenFirstCoreBinding;
 
 struct CrcResult {
@@ -68,14 +69,15 @@ struct CrcResult {
 std::vector<CrcResult> gCrcResults;
 
 enum _long_options {
-  SELECT_HELP = 0x1,
+  SELECT_HELP,
   SELECT_CORE_BINDING,
+  SELECT_NUM_SOCKETS,
   SELECT_ITERATIONS,
-  SELECT_THREADS,
-  SELECT_APPEND
+  SELECT_THREADS
 };
 static struct option long_options[] = {
   { "core-binding",  required_argument, 0, SELECT_CORE_BINDING },
+  { "sockets",       required_argument, 0, SELECT_NUM_SOCKETS },
   { "iterations",    required_argument, 0, SELECT_ITERATIONS },
   { "threads",       required_argument, 0, SELECT_THREADS },
   { "help",          no_argument,       0, SELECT_HELP },
@@ -344,7 +346,7 @@ void usage(void) {
     << "  (--iterations|-i) N" << std::endl
     << "     Generieren N Mal wiederholen (Vorgabe: " << DEFAULT_ITERATIONS << ")" << std::endl
     << std::endl
-    << "  (--core-binding|-b) [linear|evenfirst|oddfirst|none]" << std::endl
+    << "  (--core-binding|-b) (linear|evenfirst|oddfirst|none)" << std::endl
     << "     Modus, nach dem Threads Prozessorkerne gebunden werden" << std::endl
     << "     (Vorgabe: evenfirst)" << std::endl
     << std::endl
@@ -382,7 +384,7 @@ int main(int argc, char* argv[]) {
 #endif
   for (;;) {
     int option_index = 0;
-    int c = getopt_long(argc, argv, "vh?n:t:i:b:", long_options, &option_index);
+    int c = getopt_long(argc, argv, "vh?n:t:i:b:s:", long_options, &option_index);
     if (c == -1)
       break;
     switch (c)
@@ -406,6 +408,17 @@ int main(int argc, char* argv[]) {
       gRngBufSize = atoi(optarg);
       if (gRngBufSize <= 0)
         gRngBufSize = DEFAULT_RNGBUF_SIZE;
+      break;
+    case SELECT_NUM_SOCKETS:
+      // fall-through
+    case 's':
+      if (optarg == NULL) {
+        usage();
+        return EXIT_FAILURE;
+      }
+      gNumSockets = atoi(optarg);
+      if (gNumSockets <= 0)
+        gNumSockets = 1;
       break;
     case SELECT_THREADS:
       // fall-through
