@@ -517,9 +517,9 @@ int main(int argc, char* argv[]) {
 #endif
     }
     runBenchmark(numThreads, "boost::crc", Boost);
-    runBenchmark(numThreads, "default naive", DefaultNaive);
-    runBenchmark(numThreads, "default optimized", DefaultOptimized);
-    runBenchmark(numThreads, "Crc32cSSE4",    Crc32cSSE4);
+    runBenchmark(numThreads, "naive", DefaultNaive);
+    runBenchmark(numThreads, "optimized", DefaultOptimized);
+    runBenchmark(numThreads, "Crc32cSSE4", Crc32cSSE4);
   }
 
   if (gVerbose > 1) 
