@@ -4,6 +4,12 @@
 #ifndef __CRC32_H_
 #define __CRC32_H_
 
+#if defined(WIN32)
+#include "gnutypes.h"
+#elif defined(__GNUC__)
+#include <stdint.h>
+#endif
+
 // Basis-Template-Klasse für CRC32-Implementierungen
 template<uint32_t V0, uint32_t POLYNOMIAL, bool REV>
 class CRC32Base {
@@ -51,18 +57,16 @@ public:
 
   uint32_t processBlock(const uint8_t* buf, const uint8_t* const bufEnd)
   {
-    uint32_t crc = mCRC;
+    uint32_t crc = this->mCRC;
     while (buf < bufEnd) {
       crc ^= *buf++;
       int bits = 8;
       while (bits--)
-         crc = (crc & 1)? (crc >> 1) ^ mPolynomial : (crc >> 1);
+         crc = (crc & 1)? (crc >> 1) ^ this->mPolynomial : (crc >> 1);
     }
-    mCRC = crc;
+    this->mCRC = crc;
     return crc;
   }
-
-private:
 };
 
 
@@ -78,10 +82,10 @@ public:
 
   uint32_t processBlock(const uint8_t* buf, const uint8_t* const bufEnd)
   {
-    uint32_t crc = mCRC;
+    uint32_t crc = this->mCRC;
     while (buf < bufEnd)
       crc = mTab[(crc & 0xffU) ^ *buf++] ^ (crc >> 8);
-    mCRC = crc;
+    this->mCRC = crc;
     return crc;
   }
 
@@ -92,7 +96,7 @@ protected:
       uint32_t bits = i;
       int j = 8;
       while (j--)
-        bits = (bits & 1)? (bits >> 1) ^ mPolynomial : bits >> 1;
+        bits = (bits & 1)? (bits >> 1) ^ this->mPolynomial : bits >> 1;
       mTab[i] = bits;
     }
   }
