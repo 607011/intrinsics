@@ -1,5 +1,5 @@
 // Copyright (c) 2008-2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
-
+// All rights reserved.
 
 #ifdef WIN32
 #define _CRT_RAND_S
