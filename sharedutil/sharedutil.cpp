@@ -85,7 +85,7 @@ CPUFeatures::CPUFeatures(void)
     cores = ((unsigned int)(r.ecx & 0xff)) + 1;
   }
 #endif
-  ht_supported = (cores < logical_cores) && htt_supported;
+
 #if defined(WIN32)
   __cpuidex(r.reg, 0x0000000b, 0);
 #elif defined(__GNUC__)
@@ -95,6 +95,7 @@ CPUFeatures::CPUFeatures(void)
     logical_threads_apic_id_0bh = (r.eax & 0x07);
     logical_threads_0bh = (r.ebx & 0xffff);
   }
+
 #if defined(WIN32)
   __cpuidex(r.reg, 0x0000000b, 1);
 #elif defined(__GNUC__)
@@ -104,6 +105,8 @@ CPUFeatures::CPUFeatures(void)
     logical_cores_apic_id_0bh = (r.eax & 0x07);
     logical_cores_0bh = (r.ebx & 0xffff);
   }
+
+  ht_supported = (logical_threads_0bh > 1) && logical_threads_0bh;
 }
 
 
