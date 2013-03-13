@@ -497,16 +497,16 @@ int main(int argc, char* argv[]) {
     std::cout << ">>> logicalProcessorCount : " << std::setw(3) << logicalProcessorCount << std::endl;
     std::cout << ">>> processorPackageCount : " << std::setw(3) << processorPackageCount << std::endl;
     std::cout << std::endl;
+#endif
     std::cout
       << "CPUID[0bh] based processor info" << std::endl
       << "===============================" << std::endl;
     std::cout << ">>> # Cores          : " << std::setw(3) << CPUFeatures::instance().logical_cores_0bh << std::endl;
     std::cout << ">>> # Threads/core   : " << std::setw(3) << CPUFeatures::instance().logical_threads_0bh << std::endl;
     std::cout << std::endl;
-#endif
     std::cout
-      << "CPUID based processor info" << std::endl
-      << "==========================" << std::endl;
+      << "CPUID[1]/CPUID[4] based processor info" << std::endl
+      << "======================================" << std::endl;
     std::cout << ">>> CPU vendor       : " << CPUFeatures::instance().cpuVendor() << std::endl;
     std::cout << ">>> # Cores          : " << std::setw(3) << CPUFeatures::instance().getNumCores() << " (system call)" << std::endl;
     std::cout << ">>> # Logical Cores  : " << std::setw(3) << CPUFeatures::instance().logical_cores << " (CPUID[1].EBX[23:16])" << std::endl;
