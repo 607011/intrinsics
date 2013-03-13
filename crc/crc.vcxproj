@@ -152,7 +152,7 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <PostBuildEvent>
-      <Command>rem copy $(TargetDir)$(TargetFileName) "P:\crc\crc64.exe"</Command>
+      <Command>copy $(TargetDir)$(TargetFileName) "P:\crc\crc64.exe"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

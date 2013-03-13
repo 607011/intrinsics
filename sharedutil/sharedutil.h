@@ -49,6 +49,7 @@ public:
   bool isRdRandSupported(void);
   void evaluateCPUFeatures(void);
   int getNumCores(void);
+  int count(int& numaNodeCount, int& processorCoreCount, int& logicalProcessorCount, int& processorPackageCount);
 
   inline uint32_t getRdRand32(void)
   {
@@ -92,6 +93,7 @@ public:
   bool mmx_supported;
   bool sse_supported;
   bool sse2_supported;
+  bool htt_supported;
   bool ht_supported;
 
   typedef union {

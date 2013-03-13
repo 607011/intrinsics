@@ -5,6 +5,7 @@
 #define _CRT_RAND_S
 #include <Windows.h>
 #include <intrin.h>
+#include <malloc.h>
 #else
 #include <unistd.h>
 #include <cpuid.h>
@@ -58,11 +59,11 @@ CPUFeatures::CPUFeatures(void)
   mmx_supported = (r.edx & (1<<23)) != 0;
   sse_supported = (r.edx & (1<<25)) != 0;
   sse2_supported = (r.edx & (1<<26)) != 0;
-  ht_supported = (r.edx & (1<<28)) != 0;
+  htt_supported = (r.edx & (1<<28)) != 0;
 #ifdef WIN32
   if (isGenuineIntelCPU()) {
     __cpuid(r.reg, 4);
-    cores = ((r.eax >> 26) & 0x3f) + 1;
+    cores = ((r.eax >> 26) & 0x3f) + 1; 
     threads_per_package = ((r.eax >> 14) & 0xfff) + 1;
   }
   else if (isAuthenticAMDCPU()) {
@@ -80,18 +81,87 @@ CPUFeatures::CPUFeatures(void)
     cores = ((unsigned int)(r.ecx & 0xff)) + 1;
   }
 #endif
+  ht_supported = (cores < logical_cores) && htt_supported;
 }
 
 
 int CPUFeatures::getNumCores(void)
 {
 #ifdef WIN32
-  SYSTEM_INFO pInfo;
+  SYSTEM_INFO pInfo = {{0}};
   GetSystemInfo(&pInfo);
   return (int)pInfo.dwNumberOfProcessors;
 #else
   return sysconf(_SC_NPROCESSORS_ONLN);
 #endif
+}
+
+
+#if defined(WIN32) && !defined(HAVE_POPCNT)
+int POPCNT(ULONG_PTR x)
+{
+  int i = 0;
+  while (x) {
+    x = x & (x - 1);
+    ++i;
+  }
+  return i;
+}
+#endif
+
+
+int CPUFeatures::count(int& numaNodeCount, int& processorCoreCount, int& logicalProcessorCount, int& processorPackageCount)
+{
+  numaNodeCount = 0;
+  processorCoreCount = 0;
+  logicalProcessorCount = 0;
+  processorPackageCount = 0;
+#if defined(WIN32)
+  // source from http://msdn.microsoft.com/en-us/library/windows/desktop/ms683194(v=vs.85).aspx
+  typedef BOOL (WINAPI *LPFN_GLPI)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
+  LPFN_GLPI glpi = (LPFN_GLPI)GetProcAddress(GetModuleHandle(TEXT("kernel32")), "GetLogicalProcessorInformation");
+  if (glpi == NULL)
+    return -1;
+  SYSTEM_LOGICAL_PROCESSOR_INFORMATION* buffer = NULL;
+  DWORD len = 0;
+  BOOL done = FALSE;
+  while (!done) {
+    BOOL ok = glpi(buffer, &len);
+    if (!ok) {
+      if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+        if (buffer) 
+          free(buffer);
+        buffer = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION*)malloc(len);
+        if (buffer == NULL)
+          return -2;
+      } 
+      else
+        return -3;
+    } 
+    else
+      done = TRUE;
+  }
+  SYSTEM_LOGICAL_PROCESSOR_INFORMATION* pBuf = buffer;
+  DWORD byteOffset = 0;
+  while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= len) {
+    switch (pBuf->Relationship) {
+    case RelationNumaNode:
+      ++numaNodeCount;
+      break;
+    case RelationProcessorCore:
+      ++processorCoreCount;
+      logicalProcessorCount += POPCNT(pBuf->ProcessorMask);
+      break;
+    case RelationProcessorPackage:
+      ++processorPackageCount;
+      break;
+    }
+    byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+    ++pBuf;
+  }
+  free(buffer);
+#endif  
+  return logicalProcessorCount;
 }
 
 

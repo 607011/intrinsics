@@ -13,6 +13,7 @@
 #include <getopt.h>
 #include <boost/crc.hpp>
 #include <limits.h>
+#include <malloc.h>
 #include "mersenne_twister.h"
 #include "stopwatch.h"
 #include "sharedutil.h"
@@ -37,7 +38,6 @@ typedef void* LPVOID;
 #if defined(__GNUC__)
 #include <smmintrin.h>
 #endif
-
 static const int DEFAULT_ITERATIONS = 16;
 static const int DEFAULT_RNGBUF_SIZE = 128;
 static const int DEFAULT_NUM_THREADS = 1;
@@ -61,7 +61,7 @@ int gThreadIterations = 0;
 int gThreadPriority;
 int gNumSockets = 1;
 int gVerbose = 0;
-CoreBinding gCoreBinding = AutomaticCoreBinding;
+CoreBinding gCoreBinding = EvenFirstCoreBinding;
 
 struct CrcResult {
   int nThreads;
@@ -471,7 +471,7 @@ int main(int argc, char* argv[]) {
         gCoreBinding = NoCoreBinding;
       }
       else if (strcmp(optarg, "auto") == 0) {
-		  gCoreBinding = AutomaticCoreBinding;
+        gCoreBinding = AutomaticCoreBinding;
       }
       else {
         usage();
@@ -484,37 +484,58 @@ int main(int argc, char* argv[]) {
     }
   }
 
-    if (gVerbose > 1) {
-      static const char* B[2] = { "false", "true" };
-      std::cout << ">>> CPU vendor       : " << gCPU.cpuVendor() << std::endl;
-      std::cout << ">>> #cores           : " << gCPU.getNumCores() << std::endl;
-      std::cout << ">>> #logical cores   : " << gCPU.logical_cores << std::endl;
-      std::cout << ">>> #cores           : " << gCPU.cores << std::endl;
-      std::cout << ">>> #threads per pkg : " << gCPU.threads_per_package << std::endl;
-      std::cout << ">>> Hyper-Threading  : " << B[gCPU.ht_supported] << std::endl;
-      std::cout << ">>> CPU type         : " << gCPU.cpu_type << std::endl;
-      std::cout << ">>> CPU family       : " << gCPU.cpu_family << std::endl;
-      std::cout << ">>> CPU ext family   : " << gCPU.cpu_ext_family << std::endl;
-      std::cout << ">>> CPU model        : " << gCPU.cpu_model << std::endl;
-      std::cout << ">>> CPU ext model    : " << gCPU.cpu_ext_model << std::endl;
-      std::cout << ">>> CPU stepping     : " << gCPU.cpu_stepping << std::endl;
-      std::cout << ">>> CLFLUSH line size: " << gCPU.clflush_linesize << std::endl;
-      std::cout << ">>> MMX              : " << B[gCPU.mmx_supported] << std::endl;
-      std::cout << ">>> SSE              : " << B[gCPU.sse_supported] << std::endl;
-      std::cout << ">>> SSE2             : " << B[gCPU.sse2_supported] << std::endl;
-      std::cout << ">>> SSE3             : " << B[gCPU.sse3_supported] << std::endl;
-      std::cout << ">>> SSSE3            : " << B[gCPU.ssse3_supported] << std::endl;
-      std::cout << ">>> SSE4.1           : " << B[gCPU.sse41_supported] << std::endl;
-      std::cout << ">>> SSE4.2           : " << B[gCPU.sse42_supported] << std::endl;
-      std::cout << ">>> FMA              : " << B[gCPU.fma_supported] << std::endl;
-      std::cout << ">>> MONITOR/WAIT     : " << B[gCPU.monitor_wait_supported] << std::endl;
-      std::cout << ">>> VMX              : " << B[gCPU.vmx_supported] << std::endl;
-      std::cout << ">>> F16C             : " << B[gCPU.f16c_supported] << std::endl;
-      std::cout << ">>> AVX              : " << B[gCPU.avx_supported] << std::endl;
-      std::cout << ">>> POPCNT           : " << B[gCPU.popcnt_supported] << std::endl;
-      std::cout << ">>> RDRAND           : " << B[gCPU.rdrand_supported] << std::endl;
-      std::cout << ">>> AES              : " << B[gCPU.aes_supported] << std::endl;
-    }
+  if (gVerbose > 1) {
+    static const char* B[2] = { " NO", "YES" };
+    std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
+#if defined(WIN32)
+    int numaNodeCount = 0, processorCoreCount = 0, logicalProcessorCount = 0, processorPackageCount = 0;
+    gCPU.count(numaNodeCount, processorCoreCount, logicalProcessorCount, processorPackageCount);
+    std::cout << std::setfill(' ')
+      << "GetLogicalProcessorInformation()" << std::endl
+      << "================================" << std::endl;
+    std::cout << ">>> numaNodeCount         : " << std::setw(3) << numaNodeCount << std::endl;
+    std::cout << ">>> processorCoreCount    : " << std::setw(3) << processorCoreCount << std::endl;
+    std::cout << ">>> logicalProcessorCount : " << std::setw(3) << logicalProcessorCount << std::endl;
+    std::cout << ">>> processorPackageCount : " << std::setw(3) << processorPackageCount << std::endl;
+    std::cout << std::endl;
+#endif
+    std::cout
+      << "CPUID based processor info" << std::endl
+      << "==========================" << std::endl;
+    std::cout << ">>> CPU vendor       : " << gCPU.cpuVendor() << std::endl;
+    std::cout << ">>> # Cores          : " << std::setw(3) << gCPU.getNumCores() << " (system call)" << std::endl;
+    std::cout << ">>> # Logical Cores  : " << std::setw(3) << gCPU.logical_cores << " (CPUID[1].EBX[23:16])" << std::endl;
+    std::cout << ">>> # Cores          : " << std::setw(3) << gCPU.cores << " (CPUID[4].EAX[31:26]+1)" << std::endl;
+    std::cout << ">>> # Threads per pkg: " << std::setw(3) << gCPU.threads_per_package << " (CPUID[4].EAX[25:14]+1)" << std::endl;
+    std::cout << ">>> Multi-Threading  : " << B[gCPU.htt_supported] << " (CPUID[1].EDX[28])" << std::endl;
+    std::cout << ">>> Hyper-Threading  : " << B[gCPU.ht_supported] << std::endl;
+    std::cout << ">>> CPU type         : " << std::setw(3) << gCPU.cpu_type << std::endl;
+    std::cout << ">>> CPU family       : " << std::setw(3) << gCPU.cpu_family << std::endl;
+    std::cout << ">>> CPU ext family   : " << std::setw(3) << gCPU.cpu_ext_family << std::endl;
+    std::cout << ">>> CPU model        : " << std::setw(3) << gCPU.cpu_model << std::endl;
+    std::cout << ">>> CPU ext model    : " << std::setw(3) << gCPU.cpu_ext_model << std::endl;
+    std::cout << ">>> CPU stepping     : " << std::setw(3) << gCPU.cpu_stepping << std::endl;
+    std::cout << ">>> CLFLUSH line size: " << std::setw(3) << gCPU.clflush_linesize << std::endl;
+    std::cout << ">>> MMX              : " << B[gCPU.mmx_supported] << std::endl;
+    std::cout << ">>> SSE              : " << B[gCPU.sse_supported] << std::endl;
+    std::cout << ">>> SSE2             : " << B[gCPU.sse2_supported] << std::endl;
+    std::cout << ">>> SSE3             : " << B[gCPU.sse3_supported] << std::endl;
+    std::cout << ">>> SSSE3            : " << B[gCPU.ssse3_supported] << std::endl;
+    std::cout << ">>> SSE4.1           : " << B[gCPU.sse41_supported] << std::endl;
+    std::cout << ">>> SSE4.2           : " << B[gCPU.sse42_supported] << std::endl;
+    std::cout << ">>> MONITOR/WAIT     : " << B[gCPU.monitor_wait_supported] << std::endl;
+    std::cout << ">>> VMX              : " << B[gCPU.vmx_supported] << std::endl;
+    std::cout << ">>> F16C             : " << B[gCPU.f16c_supported] << std::endl;
+    std::cout << ">>> AVX              : " << B[gCPU.avx_supported] << std::endl;
+    std::cout << ">>> FMA              : " << B[gCPU.fma_supported] << std::endl;
+    std::cout << ">>> POPCNT           : " << B[gCPU.popcnt_supported] << std::endl;
+    std::cout << ">>> RDRAND           : " << B[gCPU.rdrand_supported] << std::endl;
+    std::cout << ">>> AES              : " << B[gCPU.aes_supported] << std::endl;
+    std::cout << std::endl;
+  }
+
+  if (gVerbose == 3)
+    return EXIT_SUCCESS;
 
   if (gCoreBinding == AutomaticCoreBinding) {
   }
