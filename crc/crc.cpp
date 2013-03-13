@@ -51,7 +51,6 @@ enum CoreBinding {
   AutomaticCoreBinding
 };
 
-CPUFeatures gCPU;
 int gIterations = DEFAULT_ITERATIONS;
 uint8_t* gRngBuf = NULL;
 int gRngBufSize = DEFAULT_RNGBUF_SIZE;
@@ -278,7 +277,7 @@ void*
 void runBenchmark(int numThreads, const char* strMethod, const Method method) {
   HANDLE* hThread = new HANDLE[numThreads];
   BenchmarkResult* pResult = new BenchmarkResult[numThreads];
-  int numCores = gCPU.getNumCores();
+  int numCores = CPUFeatures::instance().getNumCores();
   std::cout.setf(std::ios_base::left, std::ios_base::adjustfield);
   std::cout << "  " << std::setfill(' ') << std::setw(18) << strMethod << "  Generieren ...";
   int64_t t = LLONG_MAX;
@@ -489,7 +488,7 @@ int main(int argc, char* argv[]) {
     std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
 #if defined(WIN32)
     int numaNodeCount = 0, processorCoreCount = 0, logicalProcessorCount = 0, processorPackageCount = 0;
-    gCPU.count(numaNodeCount, processorCoreCount, logicalProcessorCount, processorPackageCount);
+    CPUFeatures::instance().count(numaNodeCount, processorCoreCount, logicalProcessorCount, processorPackageCount);
     std::cout << std::setfill(' ')
       << "GetLogicalProcessorInformation()" << std::endl
       << "================================" << std::endl;
@@ -498,39 +497,45 @@ int main(int argc, char* argv[]) {
     std::cout << ">>> logicalProcessorCount : " << std::setw(3) << logicalProcessorCount << std::endl;
     std::cout << ">>> processorPackageCount : " << std::setw(3) << processorPackageCount << std::endl;
     std::cout << std::endl;
+    std::cout
+      << "CPUID[0bh] based processor info" << std::endl
+      << "===============================" << std::endl;
+    std::cout << ">>> # Cores          : " << std::setw(3) << CPUFeatures::instance().logical_cores_0bh << std::endl;
+    std::cout << ">>> # Threads/core   : " << std::setw(3) << CPUFeatures::instance().logical_threads_0bh << std::endl;
+    std::cout << std::endl;
 #endif
     std::cout
       << "CPUID based processor info" << std::endl
       << "==========================" << std::endl;
-    std::cout << ">>> CPU vendor       : " << gCPU.cpuVendor() << std::endl;
-    std::cout << ">>> # Cores          : " << std::setw(3) << gCPU.getNumCores() << " (system call)" << std::endl;
-    std::cout << ">>> # Logical Cores  : " << std::setw(3) << gCPU.logical_cores << " (CPUID[1].EBX[23:16])" << std::endl;
-    std::cout << ">>> # Cores          : " << std::setw(3) << gCPU.cores << " (CPUID[4].EAX[31:26]+1)" << std::endl;
-    std::cout << ">>> # Threads per pkg: " << std::setw(3) << gCPU.threads_per_package << " (CPUID[4].EAX[25:14]+1)" << std::endl;
-    std::cout << ">>> Multi-Threading  : " << B[gCPU.htt_supported] << " (CPUID[1].EDX[28])" << std::endl;
-    std::cout << ">>> Hyper-Threading  : " << B[gCPU.ht_supported] << std::endl;
-    std::cout << ">>> CPU type         : " << std::setw(3) << gCPU.cpu_type << std::endl;
-    std::cout << ">>> CPU family       : " << std::setw(3) << gCPU.cpu_family << std::endl;
-    std::cout << ">>> CPU ext family   : " << std::setw(3) << gCPU.cpu_ext_family << std::endl;
-    std::cout << ">>> CPU model        : " << std::setw(3) << gCPU.cpu_model << std::endl;
-    std::cout << ">>> CPU ext model    : " << std::setw(3) << gCPU.cpu_ext_model << std::endl;
-    std::cout << ">>> CPU stepping     : " << std::setw(3) << gCPU.cpu_stepping << std::endl;
-    std::cout << ">>> CLFLUSH line size: " << std::setw(3) << gCPU.clflush_linesize << std::endl;
-    std::cout << ">>> MMX              : " << B[gCPU.mmx_supported] << std::endl;
-    std::cout << ">>> SSE              : " << B[gCPU.sse_supported] << std::endl;
-    std::cout << ">>> SSE2             : " << B[gCPU.sse2_supported] << std::endl;
-    std::cout << ">>> SSE3             : " << B[gCPU.sse3_supported] << std::endl;
-    std::cout << ">>> SSSE3            : " << B[gCPU.ssse3_supported] << std::endl;
-    std::cout << ">>> SSE4.1           : " << B[gCPU.sse41_supported] << std::endl;
-    std::cout << ">>> SSE4.2           : " << B[gCPU.sse42_supported] << std::endl;
-    std::cout << ">>> MONITOR/WAIT     : " << B[gCPU.monitor_wait_supported] << std::endl;
-    std::cout << ">>> VMX              : " << B[gCPU.vmx_supported] << std::endl;
-    std::cout << ">>> F16C             : " << B[gCPU.f16c_supported] << std::endl;
-    std::cout << ">>> AVX              : " << B[gCPU.avx_supported] << std::endl;
-    std::cout << ">>> FMA              : " << B[gCPU.fma_supported] << std::endl;
-    std::cout << ">>> POPCNT           : " << B[gCPU.popcnt_supported] << std::endl;
-    std::cout << ">>> RDRAND           : " << B[gCPU.rdrand_supported] << std::endl;
-    std::cout << ">>> AES              : " << B[gCPU.aes_supported] << std::endl;
+    std::cout << ">>> CPU vendor       : " << CPUFeatures::instance().cpuVendor() << std::endl;
+    std::cout << ">>> # Cores          : " << std::setw(3) << CPUFeatures::instance().getNumCores() << " (system call)" << std::endl;
+    std::cout << ">>> # Logical Cores  : " << std::setw(3) << CPUFeatures::instance().logical_cores << " (CPUID[1].EBX[23:16])" << std::endl;
+    std::cout << ">>> # Cores          : " << std::setw(3) << CPUFeatures::instance().cores << " (CPUID[4].EAX[31:26]+1)" << std::endl;
+    std::cout << ">>> # Threads per pkg: " << std::setw(3) << CPUFeatures::instance().threads_per_package << " (CPUID[4].EAX[25:14]+1)" << std::endl;
+    std::cout << ">>> Multi-Threading  : " << B[CPUFeatures::instance().htt_supported] << " (CPUID[1].EDX[28])" << std::endl;
+    std::cout << ">>> Hyper-Threading  : " << B[CPUFeatures::instance().ht_supported] << std::endl;
+    std::cout << ">>> CPU type         : " << std::setw(3) << CPUFeatures::instance().cpu_type << std::endl;
+    std::cout << ">>> CPU family       : " << std::setw(3) << CPUFeatures::instance().cpu_family << std::endl;
+    std::cout << ">>> CPU ext family   : " << std::setw(3) << CPUFeatures::instance().cpu_ext_family << std::endl;
+    std::cout << ">>> CPU model        : " << std::setw(3) << CPUFeatures::instance().cpu_model << std::endl;
+    std::cout << ">>> CPU ext model    : " << std::setw(3) << CPUFeatures::instance().cpu_ext_model << std::endl;
+    std::cout << ">>> CPU stepping     : " << std::setw(3) << CPUFeatures::instance().cpu_stepping << std::endl;
+    std::cout << ">>> CLFLUSH line size: " << std::setw(3) << CPUFeatures::instance().clflush_linesize << std::endl;
+    std::cout << ">>> MMX              : " << B[CPUFeatures::instance().mmx_supported] << std::endl;
+    std::cout << ">>> SSE              : " << B[CPUFeatures::instance().sse_supported] << std::endl;
+    std::cout << ">>> SSE2             : " << B[CPUFeatures::instance().sse2_supported] << std::endl;
+    std::cout << ">>> SSE3             : " << B[CPUFeatures::instance().sse3_supported] << std::endl;
+    std::cout << ">>> SSSE3            : " << B[CPUFeatures::instance().ssse3_supported] << std::endl;
+    std::cout << ">>> SSE4.1           : " << B[CPUFeatures::instance().sse41_supported] << std::endl;
+    std::cout << ">>> SSE4.2           : " << B[CPUFeatures::instance().sse42_supported] << std::endl;
+    std::cout << ">>> MONITOR/WAIT     : " << B[CPUFeatures::instance().monitor_wait_supported] << std::endl;
+    std::cout << ">>> VMX              : " << B[CPUFeatures::instance().vmx_supported] << std::endl;
+    std::cout << ">>> F16C             : " << B[CPUFeatures::instance().f16c_supported] << std::endl;
+    std::cout << ">>> AVX              : " << B[CPUFeatures::instance().avx_supported] << std::endl;
+    std::cout << ">>> FMA              : " << B[CPUFeatures::instance().fma_supported] << std::endl;
+    std::cout << ">>> POPCNT           : " << B[CPUFeatures::instance().popcnt_supported] << std::endl;
+    std::cout << ">>> RDRAND           : " << B[CPUFeatures::instance().rdrand_supported] << std::endl;
+    std::cout << ">>> AES              : " << B[CPUFeatures::instance().aes_supported] << std::endl;
     std::cout << std::endl;
   }
 
@@ -540,7 +545,7 @@ int main(int argc, char* argv[]) {
   if (gCoreBinding == AutomaticCoreBinding) {
   }
 
-  if (!gCPU.isCRCSupported()) {
+  if (!CPUFeatures::instance().isCRCSupported()) {
     std::cout
       << "//////////////////////////////////////////////////////" << std::endl
       << "/// Die CPU unterstützt die CRC-Instruktion nicht. ///" << std::endl
@@ -581,7 +586,7 @@ int main(int argc, char* argv[]) {
       << std::endl
       << "  Methode             CRC             t/Block      Durchsatz  Zyklen" << std::endl
       << "  ------------------------------------------------------------------" << std::endl;
-    if (gCPU.isCRCSupported()) {
+    if (CPUFeatures::instance().isCRCSupported()) {
       runBenchmark(numThreads, "_mm_crc32_u8", Intrinsic8);
       runBenchmark(numThreads, "_mm_crc32_u16", Intrinsic16);
       runBenchmark(numThreads, "_mm_crc32_u32", Intrinsic32);

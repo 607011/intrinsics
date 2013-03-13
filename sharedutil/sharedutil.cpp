@@ -1,12 +1,12 @@
 // Copyright (c) 2008-2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
 // All rights reserved.
 
-#ifdef WIN32
+#if defined(WIN32)
 #define _CRT_RAND_S
 #include <Windows.h>
 #include <intrin.h>
 #include <malloc.h>
-#else
+#elif (__GNUC__)
 #include <unistd.h>
 #include <cpuid.h>
 #endif
@@ -16,7 +16,7 @@
 #include <iostream>
 #include <iomanip>
 
-#ifdef WIN32
+#if defined(WIN32)
 bool hasRand_s(void) 
 {
   OSVERSIONINFO os;
@@ -29,11 +29,15 @@ bool hasRand_s(void)
 CPUFeatures::CPUFeatures(void) 
   : cores(-1)
   , threads_per_package(-1)
+  , logical_threads_apic_id_0bh(-1)
+  , logical_threads_0bh(-1)
+  , logical_cores_apic_id_0bh(-1)
+  , logical_cores_0bh(-1)
 {
   cpuid_result_t r;
-#ifdef WIN32
+#if defined(WIN32)
   __cpuid(r.reg, 1);
-#else
+#elif (__GNUC__)
   __get_cpuid(1, &r.eax, &r.ebx, &r.ecx, &r.edx);
 #endif
   cpu_type = (r.eax >> 12) & 0x3;
@@ -60,7 +64,7 @@ CPUFeatures::CPUFeatures(void)
   sse_supported = (r.edx & (1<<25)) != 0;
   sse2_supported = (r.edx & (1<<26)) != 0;
   htt_supported = (r.edx & (1<<28)) != 0;
-#ifdef WIN32
+#if defined(WIN32)
   if (isGenuineIntelCPU()) {
     __cpuid(r.reg, 4);
     cores = ((r.eax >> 26) & 0x3f) + 1; 
@@ -70,7 +74,7 @@ CPUFeatures::CPUFeatures(void)
     __cpuid(r.reg, 0x80000008);
     cores = (r.ecx & 0xff) + 1;
   }
-#else
+#elif (__GNUC__)
   if (isGenuineIntelCPU()) {
     __get_cpuid(4, &r.eax, &r.ebx, &r.ecx, &r.edx);
     cores = ((r.eax >> 26) & 0x3f) + 1;
@@ -82,6 +86,24 @@ CPUFeatures::CPUFeatures(void)
   }
 #endif
   ht_supported = (cores < logical_cores) && htt_supported;
+#if defined(WIN32)
+  __cpuidex(r.reg, 0x0000000b, 0);
+#elif defined(__GNUC__)
+  __get_cpuidex(0x0000000b, 0, &r.eax, &r.ebx, &r.ecx, &r.edx);
+#endif
+  if (((r.ecx >> 8) & 0x0f) == 1 /* thread level */) {
+    logical_threads_apic_id_0bh = (r.eax & 0x07);
+    logical_threads_0bh = (r.ebx & 0xffff);
+  }
+#if defined(WIN32)
+  __cpuidex(r.reg, 0x0000000b, 1);
+#elif defined(__GNUC__)
+  __get_cpuidex(0x0000000b, 1, &r.eax, &r.ebx, &r.ecx, &r.edx);
+#endif
+  if (((r.ecx >> 8) & 0x0f) == 2 /* core level */) {
+    logical_cores_apic_id_0bh = (r.eax & 0x07);
+    logical_cores_0bh = (r.ebx & 0xffff);
+  }
 }
 
 

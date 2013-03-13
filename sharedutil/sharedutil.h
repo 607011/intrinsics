@@ -17,31 +17,59 @@
 
 extern "C" {
 #if defined(WIN32)
-  extern bool hasRand_s(void);
+bool hasRand_s(void);
 #endif
 }
 
 
 #if defined(__GNUC__)
-inline  unsigned int _rdrand8_step(uint8_t* x) {
-  (void)x; 
-  return 0; // TODO
-}
-inline  unsigned int _rdrand16_step(uint16_t* x) {
+inline unsigned int _rdrand16_step(uint16_t* x) {
   return __builtin_ia32_rdrand16_step(x);
 }
-inline  unsigned int _rdrand32_step(uint32_t* x) {
+inline unsigned int _rdrand32_step(uint32_t* x) {
   return __builtin_ia32_rdrand32_step(x);
 }
-inline  unsigned int _rdrand64_step(uint64_t* x) {
+inline unsigned int _rdrand64_step(uint64_t* x) {
   return __builtin_ia32_rdrand64_step(reinterpret_cast<long long unsigned int*>(x));
+}
+// check with http://www.ibiblio.org/gferg/ldp/GCC-Inline-Assembly-HOWTO.html
+inline volatile void __get_cpuidex(uint32_t infoType, uint32_t ecxInput, uint32_t& eax, uint32_t& ebx, uint32_t& ecx, uint32_t& ecx) {
+  asm volatile (
+    "cpuid\n"
+		: /* output operands */ "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
+		:	/* input operands  */ "a" (infoType), "c" (ecxInput)
+    : /* list of clobbered registers */);
+}
+#endif
+
+
+inline uint32_t getRdRand32(void)
+{
+  uint32_t x;
+  _rdrand32_step(&x);
+  return x;
+}
+
+
+#if defined(_M_X64)
+inline uint64_t getRdRand64(void)
+{
+  uint64_t x;
+  _rdrand64_step(&x);
+  return x;
 }
 #endif
 
 
 class CPUFeatures {
+private: // Singleton
+  CPUFeatures(void); 
+
 public:
-  CPUFeatures(void);
+  static CPUFeatures& instance(void) { 
+    static CPUFeatures INSTANCE;
+    return INSTANCE;
+  }
   std::string cpuVendor(void);
   bool isGenuineIntelCPU(void);
   bool isAuthenticAMDCPU(void);
@@ -51,23 +79,7 @@ public:
   int getNumCores(void);
   int count(int& numaNodeCount, int& processorCoreCount, int& logicalProcessorCount, int& processorPackageCount);
 
-  inline uint32_t getRdRand32(void)
-  {
-    uint32_t x;
-    _rdrand32_step(&x);
-    return x;
-  }
-
-
-#if defined(_M_X64)
-  inline uint64_t getRdRand64(void)
-  {
-    uint64_t x;
-    _rdrand64_step(&x);
-    return x;
-  }
-#endif
-
+public: // member variables
   int cores;
   int threads_per_package;
   int clflush_linesize;
@@ -78,6 +90,10 @@ public:
   int cpu_ext_model;
   int cpu_stepping;
   int logical_cores;
+  int logical_threads_apic_id_0bh;
+  int logical_threads_0bh;
+  int logical_cores_apic_id_0bh;
+  int logical_cores_0bh;
   bool sse3_supported;
   bool ssse3_supported;
   bool monitor_wait_supported;
@@ -105,6 +121,7 @@ public:
       uint32_t edx;
     };
   } cpuid_result_t;
+
 };
 
 
