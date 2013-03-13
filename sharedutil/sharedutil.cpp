@@ -72,7 +72,7 @@ CPUFeatures::CPUFeatures(void)
 #else
   if (isGenuineIntelCPU()) {
     __get_cpuid(4, &r.eax, &r.ebx, &r.ecx, &r.edx);
-    cores = ((eax >> 26) & 0x3f) + 1;
+    cores = ((r.eax >> 26) & 0x3f) + 1;
     threads_per_package = ((r.eax >> 14) & 0xfff) + 1;
   }
   else if (isAuthenticAMDCPU()) {
