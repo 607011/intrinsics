@@ -34,9 +34,9 @@ CPUFeatures::CPUFeatures(void)
 
   logical_cores_from_system = getNumCores();
   for (unsigned int i = 0; i < logical_cores_from_system; ++i) {
-  cpuid_result_t r = {{ 0, 0, 0, 0 }};
-  lockToLogicalProcessor(i);
-  getCoresForCurrentProcessor(cores, threads_per_package);
+    cpuid_result_t r = {{ 0, 0, 0, 0 }};
+    lockToLogicalProcessor(i);
+    getCoresForCurrentProcessor(cores, threads_per_package);
 #if defined(WIN32)
     __cpuid(r.reg, 1);
 #elif defined(__GNUC__)
@@ -186,7 +186,7 @@ void CPUFeatures::detectFeatures(void)
 }
 
 
-int CPUFeatures::getNumCores(void)
+int CPUFeatures::getNumCores(void) const
 {
 #ifdef WIN32
   SYSTEM_INFO pInfo = {{0}};
@@ -198,23 +198,23 @@ int CPUFeatures::getNumCores(void)
 }
 
 
-void CPUFeatures::lockToLogicalProcessor(int core) 
+void CPUFeatures::lockToLogicalProcessor(int core) const
 {
 #if defined(WIN32)
-    DWORD_PTR affinityMask = 1U << core;
-    SetThreadAffinityMask(GetCurrentThread(), affinityMask);
+  DWORD_PTR affinityMask = 1U << core;
+  SetThreadAffinityMask(GetCurrentThread(), affinityMask);
 #elif defined(__GNUC__)
-    // set CPU affinity
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(core, &cpuset);
-    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+  // set CPU affinity
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(core, &cpuset);
+  pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
 #endif
 }
 
 
 #if defined(WIN32) && !defined(HAVE_POPCNT)
-int POPCNT(ULONG_PTR x)
+static int POPCNT(ULONG_PTR x)
 {
   int i = 0;
   while (x) {
@@ -228,9 +228,9 @@ int POPCNT(ULONG_PTR x)
 
 #if defined(WIN32)
 int CPUFeatures::count(int& numaNodeCount,
-		       int& processorCoreCount,
-		       int& logicalProcessorCount,
-		       int& processorPackageCount)
+                       int& processorCoreCount,
+                       int& logicalProcessorCount,
+                       int& processorPackageCount)
 {
   numaNodeCount = 0;
   processorCoreCount = 0;
@@ -284,21 +284,21 @@ int CPUFeatures::count(int& numaNodeCount,
 #endif  
 
 
-bool CPUFeatures::isGenuineIntelCPU(void) {
+bool CPUFeatures::isGenuineIntelCPU(void) const {
   return vendor == "GenuineIntel";
 }
 
 
-bool CPUFeatures::isAuthenticAMDCPU(void) {
+bool CPUFeatures::isAuthenticAMDCPU(void) const {
   return vendor == "AuthenticAMD";
 }
 
 
-bool CPUFeatures::isCRCSupported(void) {
+bool CPUFeatures::isCRCSupported(void) const {
   return isGenuineIntelCPU() && sse42_supported;
 }
 
 
-bool CPUFeatures::isRdRandSupported(void) {
+bool CPUFeatures::isRdRandSupported(void) const {
   return isGenuineIntelCPU() && rdrand_supported;
 }

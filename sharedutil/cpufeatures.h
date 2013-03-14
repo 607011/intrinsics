@@ -19,11 +19,10 @@
 #endif
 
 
-struct LogicalProcessorData 
-{
+struct LogicalProcessorData {
   unsigned int localApicId;
-  bool HTT;
   unsigned int logicalProcessorCount;
+  bool HTT;
 };
 
 
@@ -34,19 +33,19 @@ private: // Singleton
   void detectVendor(void);
   void detectFeatures(void);
   void getCoresForCurrentProcessor(unsigned int& nCores, unsigned int& nThreadsPerCore);
-  void lockToLogicalProcessor(int core);
+  void lockToLogicalProcessor(int core) const;
 
 public:
   static CPUFeatures& instance(void) { 
     static CPUFeatures INSTANCE;
     return INSTANCE;
   }
-  bool isGenuineIntelCPU(void);
-  bool isAuthenticAMDCPU(void);
-  bool isCRCSupported(void);
-  bool isRdRandSupported(void);
+  bool isGenuineIntelCPU(void) const;
+  bool isAuthenticAMDCPU(void) const;
+  bool isCRCSupported(void) const;
+  bool isRdRandSupported(void) const;
   void evaluateCPUFeatures(void);
-  int getNumCores(void);
+  int getNumCores(void) const;
 
 #if defined(WIN32)
   int count(int& numaNodeCount, int& processorCoreCount, int& logicalProcessorCount, int& processorPackageCount);
