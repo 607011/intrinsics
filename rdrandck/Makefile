@@ -7,7 +7,7 @@ DEPS =
 OBJ = $(SRC:.cpp=.o)
 INCLUDES = -I../sharedutil
 CXX = g++
-LIBS = -L../sharedutil -lsharedutil
+LIBS = -L../sharedutil -lsharedutil -lpthread
 LDFLAGS =
 .SUFFIXES = .cpp
 

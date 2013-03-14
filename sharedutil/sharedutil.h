@@ -4,11 +4,12 @@
 #ifndef __INTRINSICS_UTIL_H_
 #define __INTRINSICS_UTIL_H_
 
+#include <string>
+#include <vector>
+
 #if defined(WIN32)
 #include "gnutypes.h"
 #endif
-
-#include <string>
 
 #if defined(__GNUC__)
 #include <stdint.h>
@@ -33,18 +34,16 @@ inline unsigned int _rdrand64_step(uint64_t* x) {
   return __builtin_ia32_rdrand64_step(reinterpret_cast<long long unsigned int*>(x));
 }
 
-#define __get_cpuidex__(infoType, ecxInput, eax, ebx, ecx, edx) \
-  __asm__ ( \
-	   "cpuid\n\t" \
-	   : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) \
-	   : "a"(infoType), "c"(ecxInput) \
-	    )
 
-inline void
-__get_cpuidex(uint32_t infoType, uint32_t ecxInput,
-	      uint32_t* eax, uint32_t* ebx, uint32_t* ecx, uint32_t* edx)
+inline void 
+__get_cpuidex(/* IN */ uint32_t infoType, uint32_t ecxInput,
+	      /* OUT */ uint32_t* eax, uint32_t* ebx, uint32_t* ecx, uint32_t* edx)
 {
-  __get_cpuidex__(infoType, ecxInput, *eax, *ebx, *ecx, *edx);
+  asm volatile (
+		"cpuid\n"
+		: "=a"(*eax), "=b"(*ebx), "=c"(*ecx), "=d"(*edx)
+		: "a"(infoType), "c"(ecxInput)
+		);
 }
 #endif
 
@@ -67,13 +66,23 @@ inline uint64_t getRdRand64(void)
 #endif
 
 
+struct LogicalProcessorData 
+{
+  unsigned int localApicId;
+  bool HTT;
+  unsigned int logicalProcessorCount;
+};
+
+
 class CPUFeatures {
 private: // Singleton
   CPUFeatures(void); 
 
   void detectVendor(void);
-  void detectTopology(void);
+  void getCoresForCurrentProcessor(unsigned int& nCores, unsigned int& nThreadsPerCore);
   void detectFeatures(void);
+
+  void lockToLogicalProcessor(int core);
 
 public:
   static CPUFeatures& instance(void) { 
@@ -95,6 +104,7 @@ public: // member variables
   unsigned int max_func;
   unsigned int cores;
   unsigned int threads_per_package;
+  unsigned int logical_cores_from_system;
   unsigned int logical_cores;
   unsigned int logical_threads_apic_id_0bh;
   unsigned int logical_threads_0bh;
@@ -125,6 +135,7 @@ public: // member variables
   bool htt_supported;
   bool ht_supported;
   std::string vendor;
+  std::vector<LogicalProcessorData> logical_cpu_data;
 
   typedef union {
     int reg[4];

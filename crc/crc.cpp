@@ -48,8 +48,18 @@ enum CoreBinding {
   LinearCoreBinding,
   EvenFirstCoreBinding,
   OddFirstCoreBinding,
-  AutomaticCoreBinding
+  AutomaticCoreBinding,
+  _LastCoreBinding
 };
+
+std::string CoreBindingString[_LastCoreBinding] =
+  {
+    "keine (none)",
+    "linear (linear)",
+    "Kerne mit gerader Nummer zuerst (evenfirst)",
+    "Kerne mit ungerader Nummer zuerst (oddfirst)",
+    "automatisch (auto)"
+  };
 
 int gIterations = DEFAULT_ITERATIONS;
 uint8_t* gRngBuf = NULL;
@@ -60,7 +70,7 @@ int gThreadIterations = 0;
 int gThreadPriority;
 int gNumSockets = 1;
 int gVerbose = 0;
-CoreBinding gCoreBinding = EvenFirstCoreBinding;
+CoreBinding gCoreBinding = AutomaticCoreBinding;
 
 struct CrcResult {
   int nThreads;
@@ -349,8 +359,8 @@ void usage(void) {
     << "     Generieren N Mal wiederholen (Vorgabe: " << DEFAULT_ITERATIONS << ")" << std::endl
     << std::endl
     << "  (--core-binding|-b) (linear|evenfirst|oddfirst|none|auto)" << std::endl
-    << "     Modus, nach dem Threads Prozessorkerne gebunden werden" << std::endl
-    << "     (Vorgabe: auto)" << std::endl
+    << "     Modus, nach dem Threads an logische CPU-Kerne gebunden werden" << std::endl
+    << "     (Vorgabe: none)" << std::endl
     << std::endl
     << "  (--quiet|-q)" << std::endl
     << "     Keine Informationen ausgeben" << std::endl
@@ -487,34 +497,22 @@ int main(int argc, char* argv[]) {
     static const char* B[2] = { " NO", "YES" };
     std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
 
+    const std::vector<LogicalProcessorData>& cpu = CPUFeatures::instance().logical_cpu_data;
+    std::cout << ">>>\tAPIC\tHT\t#" << std::endl;
+    for (std::vector<LogicalProcessorData>::const_iterator i = cpu.begin(); i != cpu.end(); ++i) {
+      std::cout << ">>>\t"
+	<< i->localApicId << "\t" 
+	<< i->HTT << "\t" 
+	<< i->logicalProcessorCount << std::endl;
+    }
+
     std::cout
-      << ">>> # Cores          : "
+      << ">>> # Logical cores (by system call): "
+      << std::setw(3) << CPUFeatures::instance().logical_cores_from_system << std::endl
+      << ">>> # Logical cores  : "
       << std::setw(3) << CPUFeatures::instance().cores << std::endl
       << ">>> # Threads/core   : "
       << std::setw(3) << CPUFeatures::instance().threads_per_package << std::endl
-      << std::endl;
-
-#if defined(WIN32)
-    int numaNodeCount = 0, processorCoreCount = 0,
-      logicalProcessorCount = 0, processorPackageCount = 0;
-    CPUFeatures::instance().count(numaNodeCount, processorCoreCount,
-				  logicalProcessorCount, processorPackageCount);
-    std::cout
-      << std::setfill(' ')
-      << "GetLogicalProcessorInformation()" << std::endl
-      << "================================" << std::endl
-      << ">>> numaNodeCount         : "
-      << std::setw(3) << numaNodeCount << std::endl
-      << ">>> processorCoreCount    : "
-      << std::setw(3) << processorCoreCount << std::endl
-      << ">>> logicalProcessorCount : "
-      << std::setw(3) << logicalProcessorCount << std::endl
-      << ">>> processorPackageCount : "
-      << std::setw(3) << processorPackageCount << std::endl
-      << std::endl;
-#endif
-
-    std::cout
       << ">>> CPU vendor       : "
       << CPUFeatures::instance().vendor << std::endl
       << ">>> Multi-Threading  : "
@@ -572,8 +570,14 @@ int main(int argc, char* argv[]) {
     return EXIT_SUCCESS;
 
   if (gCoreBinding == AutomaticCoreBinding) {
-    // TODO
+    gCoreBinding = (CPUFeatures::instance().ht_supported)
+      ? EvenFirstCoreBinding
+      : NoCoreBinding;
   }
+
+  if (gVerbose > 1)
+    std::cout << "Bindung der Threads an logische Kerne: "
+	      << CoreBindingString[gCoreBinding] << std::endl;
 
   if (!CPUFeatures::instance().isCRCSupported()) {
     std::cout

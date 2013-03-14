@@ -44,7 +44,27 @@ CPUFeatures::CPUFeatures(void)
   max_func = r.eax;
 
   detectVendor();
-  detectTopology();
+
+  logical_cores_from_system = getNumCores();
+  for (unsigned int i = 0; i < logical_cores_from_system; ++i) {
+  cpuid_result_t r = {{ 0, 0, 0, 0 }};
+  lockToLogicalProcessor(i);
+  getCoresForCurrentProcessor(cores, threads_per_package);
+#if defined(WIN32)
+    __cpuid(r.reg, 1);
+#elif defined(__GNUC__)
+    __get_cpuid(1, &r.eax, &r.ebx, &r.ecx, &r.edx);
+#endif
+    LogicalProcessorData data = {
+      ((r.ebx >> 24) & 0xff),
+      ((r.edx >> 28) & 0x1) == 0x1,
+      threads_per_package // ((r.ebx >> 16) & 0xff)
+    };
+    logical_cpu_data.push_back(data);
+  }
+
+  ht_supported = (threads_per_package > 1) && htt_supported;
+
   detectFeatures();
 }
 
@@ -65,16 +85,16 @@ void CPUFeatures::detectVendor(void)
   _vendor.reg[2] = r.ecx;
 #else
   __get_cpuid(0, &r.eax, &r.ebx, &r.ecx, &r.edx);
-  vendor.reg[0] = r.ebx;
-  vendor.reg[1] = r.edx;
-  vendor.reg[2] = r.ecx;
+  _vendor.reg[0] = r.ebx;
+  _vendor.reg[1] = r.edx;
+  _vendor.reg[2] = r.ecx;
 #endif
   vendor = std::string(_vendor.str, 12);
 }
 
 
 // http://wiki.osdev.org/Detecting_CPU_Topology_%2880x86%29
-void CPUFeatures::detectTopology(void)
+void CPUFeatures::getCoresForCurrentProcessor(unsigned int& nCores, unsigned int& nThreadsPerCore)
 {
   cpuid_result_t r;
 
@@ -85,8 +105,8 @@ void CPUFeatures::detectTopology(void)
 #endif
   htt_supported = (r.edx & (1<<28)) != 0;
   if (!htt_supported) {
-    cores = 1;
-    threads_per_package = 1;
+    nCores = 1;
+    nThreadsPerCore = 1;
     return;
   }
 
@@ -114,8 +134,8 @@ void CPUFeatures::detectTopology(void)
     }
 
     if (logical_cores_0bh > 0 && logical_threads_0bh > 0) {
-      cores = logical_cores_0bh;
-      threads_per_package = logical_threads_0bh;
+      nCores = logical_cores_0bh;
+      nThreadsPerCore = logical_threads_0bh;
       return;
     }
   }
@@ -128,17 +148,17 @@ void CPUFeatures::detectTopology(void)
   }
   else if (isAuthenticAMDCPU()) {
     __cpuid(r.reg, 0x80000008);
-    cores = (r.ecx & 0xff) + 1;
+    nCores = (r.ecx & 0xff) + 1;
   }
 #elif (__GNUC__)
   if (isGenuineIntelCPU()) {
     __get_cpuid(4, &r.eax, &r.ebx, &r.ecx, &r.edx);
-    cores = ((r.eax >> 26) & 0x3f) + 1;
-    threads_per_package = ((r.eax >> 14) & 0xfff) + 1;
+    nCores = ((r.eax >> 26) & 0x3f) + 1;
+    nThreadsPerCore = ((r.eax >> 14) & 0xfff) + 1;
   }
   else if (isAuthenticAMDCPU()) {
     __get_cpuid(0x80000008, &r.eax, &r.ebx, &r.ecx, &r.edx);
-    cores = ((unsigned int)(r.ecx & 0xff)) + 1;
+    nCores = ((unsigned int)(r.ecx & 0xff)) + 1;
   }
 #endif
 }
@@ -176,7 +196,6 @@ void CPUFeatures::detectFeatures(void)
   mmx_supported = (r.edx & (1<<23)) != 0;
   sse_supported = (r.edx & (1<<25)) != 0;
   sse2_supported = (r.edx & (1<<26)) != 0;
-  ht_supported = (threads_per_package > 1) && htt_supported;
 }
 
 
@@ -188,6 +207,21 @@ int CPUFeatures::getNumCores(void)
   return (int)pInfo.dwNumberOfProcessors;
 #else
   return sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+}
+
+
+void CPUFeatures::lockToLogicalProcessor(int core) 
+{
+#if defined(WIN32)
+    DWORD_PTR affinityMask = 1U << core;
+    SetThreadAffinityMask(GetCurrentThread(), affinityMask);
+#elif defined(__GNUC__)
+    // set CPU affinity
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core, &cpuset);
+    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
 #endif
 }
 
@@ -205,7 +239,10 @@ int POPCNT(ULONG_PTR x)
 #endif
 
 
-int CPUFeatures::count(int& numaNodeCount, int& processorCoreCount, int& logicalProcessorCount, int& processorPackageCount)
+int CPUFeatures::count(int& numaNodeCount,
+		       int& processorCoreCount,
+		       int& logicalProcessorCount,
+		       int& processorPackageCount)
 {
   numaNodeCount = 0;
   processorCoreCount = 0;
@@ -255,6 +292,8 @@ int CPUFeatures::count(int& numaNodeCount, int& processorCoreCount, int& logical
     ++pBuf;
   }
   free(buffer);
+#elif defined(__GNUC__)
+  numaNodeCount = logical_cores_from_system;
 #endif  
   return logicalProcessorCount;
 }
