@@ -29,6 +29,11 @@ configured:
 		$(MAKE) -C $$dir $(TARGET); \
 	done
 
+dep:
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir dep; \
+	done
+
 clean:
 	for dir in $(SUBDIRS); do \
 		$(MAKE) -C $$dir clean; \

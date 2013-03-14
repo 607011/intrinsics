@@ -1,13 +1,11 @@
 # Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
 # All rights reserved.
-
 SRC = sharedutil.cpp
 OBJ = $(SRC:.cpp=.o)
 OUT = libsharedutil.a
 INCLUDES = 
 CXX = g++
 LIBS = 
-.SUFFIXES = .cpp
 
 all:
 	@echo Bitte mit \"make target\" aufrufen, wobei \"target\" eine der folgenden Optionen ist:
@@ -19,7 +17,7 @@ all:
 x86-release:
 	$(MAKE) CXXFLAGS="-Wall -O2 -m32 -march=corei7 -msse4.2 -mrdrnd -mcrc32" LDFLAGS="-s" configured
 
-x64-release:
+x64-release: dep
 	$(MAKE) CXXFLAGS="-Wall -O2 -m64 -march=corei7 -msse4.2 -mrdrnd -mcrc32" LDFLAGS="-s" configured
 
 x86-debug:
@@ -30,11 +28,19 @@ x64-debug:
 
 configured: $(OUT)
 
-.cpp.o: sharedutil.h
+.cpp.o:
 	$(CXX) $(INCLUDES) $(CXXFLAGS) -c $< -o $@
+
+dep:
+	$(CXX) $(INCLUDES) $(CXXFLAGS) -MM $(SRC) > $@
+
+include dep
 
 $(OUT): $(OBJ)
 	ar rcs $(OUT) $(OBJ)
 
 clean:
 	rm -f $(OBJ) $(OUT)
+
+mrproper: clean
+	rm -f dep

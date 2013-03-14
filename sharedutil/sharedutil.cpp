@@ -70,7 +70,7 @@ void CPUFeatures::detectTopology(void)
 #if defined(WIN32)
       __cpuidex(r.reg, 0x0000000b, 0);
 #elif defined(__GNUC__)
-      __get_cpuidex(0x0000000b, 0, r.eax, r.ebx, r.ecx, r.edx);
+      __get_cpuidex(0x0000000b, 0, &r.eax, &r.ebx, &r.ecx, &r.edx);
 #endif
       if (((r.ecx >> 8) & 0x0f) == 1 /* thread level */) {
         logical_threads_apic_id_0bh = (r.eax & 0x07);
@@ -81,7 +81,7 @@ void CPUFeatures::detectTopology(void)
 #if defined(WIN32)
     __cpuidex(r.reg, 0x0000000b, 1);
 #elif defined(__GNUC__)
-    __get_cpuidex(0x0000000b, 1, r.eax, r.ebx, r.ecx, r.edx);
+    __get_cpuidex(0x0000000b, 1, &r.eax, &r.ebx, &r.ecx, &r.edx);
 #endif
     if (((r.ecx >> 8) & 0x0f) == 2 /* core level */) {
       logical_cores_apic_id_0bh = (r.eax & 0x07);
