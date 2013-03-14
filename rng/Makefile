@@ -2,7 +2,6 @@
 # All rights reserved.
 
 SRC = mersenne_twister.cpp
-DEPS = circ.h marsaglia.h mcg.h mersenne_twister.h 
 OBJ = $(SRC:.cpp=.o)
 OUT = librng.a
 INCLUDES = -I../sharedutil
@@ -30,10 +29,14 @@ x86-debug:
 x64-debug:
 	$(MAKE) CXXFLAGS="-Wall -m64 -march=corei7 -msse4.2 -mrdrnd -mcrc32 -DDEBUG -ggdb" configured
 
+dep:
+	$(CXX) $(INCLUDES) $(CXXFLAGS) -MM $(SRC) > $@
+
+include dep
 
 configured: $(OUT)
 
-.cpp.o:	$(DEPS)
+.cpp.o:
 	$(CXX) $(INCLUDES) $(CXXFLAGS) -c $< -o $@
 
 $(OUT): $(OBJ)
@@ -41,3 +44,6 @@ $(OUT): $(OBJ)
 
 clean:
 	rm -f $(OBJ) $(OUT)
+
+mrproper: clean
+	rm -f dep
