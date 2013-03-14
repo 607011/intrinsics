@@ -16,7 +16,7 @@
 #include <malloc.h>
 #include "mersenne_twister.h"
 #include "stopwatch.h"
-#include "sharedutil.h"
+#include "cpufeatures.h"
 #include "crc32.h"
 
 #include "crcutil-fast/crc32c_sse4.h"

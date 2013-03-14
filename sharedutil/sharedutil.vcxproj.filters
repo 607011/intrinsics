@@ -24,9 +24,15 @@
     <ClInclude Include="gnutypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="cpufeatures.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="sharedutil.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cpufeatures.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

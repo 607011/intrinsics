@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <iostream>
 
-#include "sharedutil.h"
+#include "cpufeatures.h"
 
 int main(int argc, char* argv[])
 {

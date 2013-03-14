@@ -1,6 +1,7 @@
 # Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
 # All rights reserved.
-SRC = sharedutil.cpp
+
+SRC = sharedutil.cpp cpufeatures.cpp
 OBJ = $(SRC:.cpp=.o)
 OUT = libsharedutil.a
 INCLUDES = 

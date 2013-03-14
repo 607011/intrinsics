@@ -15,8 +15,7 @@
 
 #include <stdlib.h>
 
-#include "sharedutil.h"
-
+#include "cpufeatures.h"
 
 template <typename T>
 class AbstractRandomNumberGenerator

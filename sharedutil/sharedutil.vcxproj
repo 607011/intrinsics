@@ -27,11 +27,13 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cpufeatures.h" />
     <ClInclude Include="gnutypes.h" />
     <ClInclude Include="sharedutil.h" />
     <ClInclude Include="stopwatch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="cpufeatures.cpp" />
     <ClCompile Include="sharedutil.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
