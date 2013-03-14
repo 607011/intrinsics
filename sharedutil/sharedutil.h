@@ -65,6 +65,9 @@ class CPUFeatures {
 private: // Singleton
   CPUFeatures(void); 
 
+  void detectTopology(void);
+  void detectFeatures(void);
+
 public:
   static CPUFeatures& instance(void) { 
     static CPUFeatures INSTANCE;
@@ -77,23 +80,27 @@ public:
   bool isRdRandSupported(void);
   void evaluateCPUFeatures(void);
   int getNumCores(void);
-  int count(int& numaNodeCount, int& processorCoreCount, int& logicalProcessorCount, int& processorPackageCount);
+  int count(int& numaNodeCount,
+	    int& processorCoreCount,
+	    int& logicalProcessorCount,
+	    int& processorPackageCount);
 
 public: // member variables
-  int cores;
-  int threads_per_package;
-  int clflush_linesize;
-  int cpu_type;
-  int cpu_family;
-  int cpu_ext_family;
-  int cpu_model;
-  int cpu_ext_model;
-  int cpu_stepping;
-  int logical_cores;
-  int logical_threads_apic_id_0bh;
-  int logical_threads_0bh;
-  int logical_cores_apic_id_0bh;
-  int logical_cores_0bh;
+  unsigned int max_func;
+  unsigned int cores;
+  unsigned int threads_per_package;
+  unsigned int logical_cores;
+  unsigned int logical_threads_apic_id_0bh;
+  unsigned int logical_threads_0bh;
+  unsigned int logical_cores_apic_id_0bh;
+  unsigned int logical_cores_0bh;
+  unsigned int clflush_linesize;
+  unsigned int cpu_type;
+  unsigned int cpu_family;
+  unsigned int cpu_ext_family;
+  unsigned int cpu_model;
+  unsigned int cpu_ext_model;
+  unsigned int cpu_stepping;
   bool sse3_supported;
   bool ssse3_supported;
   bool monitor_wait_supported;
