@@ -42,9 +42,34 @@ CPUFeatures::CPUFeatures(void)
   __get_cpuid(0, &r.eax, &r.ebx, &r.ecx, &r.edx);
 #endif
   max_func = r.eax;
-  
+
+  detectVendor();
   detectTopology();
   detectFeatures();
+}
+
+
+void CPUFeatures::detectVendor(void)
+{
+  cpuid_result_t r;
+  union {
+    char str[12];
+    struct {
+      uint32_t reg[3];
+    };
+  } _vendor;
+#if defined(WIN32)
+  __cpuid(r.reg, 0);
+  _vendor.reg[0] = r.ebx;
+  _vendor.reg[1] = r.edx;
+  _vendor.reg[2] = r.ecx;
+#else
+  __get_cpuid(0, &r.eax, &r.ebx, &r.ecx, &r.edx);
+  vendor.reg[0] = r.ebx;
+  vendor.reg[1] = r.edx;
+  vendor.reg[2] = r.ecx;
+#endif
+  vendor = std::string(_vendor.str, 12);
 }
 
 
@@ -73,7 +98,7 @@ void CPUFeatures::detectTopology(void)
       __get_cpuidex(0x0000000b, 0, &r.eax, &r.ebx, &r.ecx, &r.edx);
 #endif
       if (((r.ecx >> 8) & 0x0f) == 1 /* thread level */) {
-        logical_threads_apic_id_0bh = (r.eax & 0x07);
+        logical_threads_apic_id_0bh = 2 << (r.eax & 0x07);
         logical_threads_0bh = (r.ebx & 0xffff);
       }
     }
@@ -84,7 +109,7 @@ void CPUFeatures::detectTopology(void)
     __get_cpuidex(0x0000000b, 1, &r.eax, &r.ebx, &r.ecx, &r.edx);
 #endif
     if (((r.ecx >> 8) & 0x0f) == 2 /* core level */) {
-      logical_cores_apic_id_0bh = (r.eax & 0x07);
+      logical_cores_apic_id_0bh = 2 << (r.eax & 0x07);
       logical_cores_0bh = (r.ebx & 0xffff);
     }
 
@@ -235,36 +260,13 @@ int CPUFeatures::count(int& numaNodeCount, int& processorCoreCount, int& logical
 }
 
 
-std::string CPUFeatures::cpuVendor(void) {
-  union {
-    char str[12];
-    struct {
-      uint32_t reg[3];
-    };
-  } vendor;
-  cpuid_result_t r;
-#if defined(WIN32)
-  __cpuid(r.reg, 0);
-  vendor.reg[0] = r.ebx;
-  vendor.reg[1] = r.edx;
-  vendor.reg[2] = r.ecx;
-#else
-  __get_cpuid(0, &r.eax, &r.ebx, &r.ecx, &r.edx);
-  vendor.reg[0] = r.ebx;
-  vendor.reg[1] = r.edx;
-  vendor.reg[2] = r.ecx;
-#endif
-  return std::string(vendor.str, 12);
-}
-
-
 bool CPUFeatures::isGenuineIntelCPU(void) {
-  return cpuVendor() == "GenuineIntel";
+  return vendor == "GenuineIntel";
 }
 
 
 bool CPUFeatures::isAuthenticAMDCPU(void) {
-  return cpuVendor() == "AuthenticAMD";
+  return vendor == "AuthenticAMD";
 }
 
 

@@ -492,10 +492,6 @@ int main(int argc, char* argv[]) {
       << std::setw(3) << CPUFeatures::instance().cores << std::endl
       << ">>> # Threads/core   : "
       << std::setw(3) << CPUFeatures::instance().threads_per_package << std::endl
-      << ">>> # APIC ID cores  : "
-      << std::setw(3) << CPUFeatures::instance().logical_cores_apic_id_0bh << std::endl
-      << ">>> # APIC ID threads: "
-      << std::setw(3) << CPUFeatures::instance().logical_threads_apic_id_0bh << std::endl
       << std::endl;
 
 #if defined(WIN32)
@@ -520,7 +516,7 @@ int main(int argc, char* argv[]) {
 
     std::cout
       << ">>> CPU vendor       : "
-      << CPUFeatures::instance().cpuVendor() << std::endl
+      << CPUFeatures::instance().vendor << std::endl
       << ">>> Multi-Threading  : "
       << B[CPUFeatures::instance().htt_supported] << std::endl
       << ">>> Hyper-Threading  : "

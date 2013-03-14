@@ -71,6 +71,7 @@ class CPUFeatures {
 private: // Singleton
   CPUFeatures(void); 
 
+  void detectVendor(void);
   void detectTopology(void);
   void detectFeatures(void);
 
@@ -79,7 +80,6 @@ public:
     static CPUFeatures INSTANCE;
     return INSTANCE;
   }
-  std::string cpuVendor(void);
   bool isGenuineIntelCPU(void);
   bool isAuthenticAMDCPU(void);
   bool isCRCSupported(void);
@@ -124,6 +124,7 @@ public: // member variables
   bool sse2_supported;
   bool htt_supported;
   bool ht_supported;
+  std::string vendor;
 
   typedef union {
     int reg[4];

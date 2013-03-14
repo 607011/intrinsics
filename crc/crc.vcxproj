@@ -210,7 +210,7 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <PostBuildEvent>
-      <Command>rem copy $(TargetDir)$(TargetFileName) "P:\crc\crc64.exe"</Command>
+      <Command>copy $(TargetDir)$(TargetFileName) "P:\crc\crc64.exe"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release SSE4.2|x64'">
