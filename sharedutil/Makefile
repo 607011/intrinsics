@@ -18,7 +18,7 @@ all:
 x86-release:
 	$(MAKE) CXXFLAGS="-Wall -O2 -m32 -march=corei7 -msse4.2 -mrdrnd -mcrc32" LDFLAGS="-s" configured
 
-x64-release: dep
+x64-release:
 	$(MAKE) CXXFLAGS="-Wall -O2 -m64 -march=corei7 -msse4.2 -mrdrnd -mcrc32" LDFLAGS="-s" configured
 
 x86-debug:

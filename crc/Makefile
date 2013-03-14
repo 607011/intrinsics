@@ -3,7 +3,6 @@
 SRC = crc.cpp
 OBJ = $(SRC:.cpp=.o)
 CXX = g++
-DEPS = Makefile
 INCLUDES = -I../sharedutil -I../rng -Icrcutil-fast
 LIBS = -L../sharedutil -L../rng -lsharedutil -lrng -lrt -lpthread -Lcrcutil-fast -lcrcfast64
 LDFLAGS = -s
@@ -30,11 +29,19 @@ x64-debug:
 
 configured: $(OUT)
 
-crc.o: crc.cpp crc32.h $(DEPS)
-	$(CXX) $(INCLUDES) $(CXXFLAGS) -c crc.cpp -o crc.o
+.cpp.o:
+	$(CXX) $(INCLUDES) $(CXXFLAGS) -c $< -o $@
+
+dep:
+	$(CXX) $(INCLUDES) $(CXXFLAGS) -msse4.2 -MM $(SRC) > $@
+
+include dep
 
 $(OUT): $(OBJ)
 	$(CXX) $(OBJ) $(LDFLAGS) $(LIBS) -o $(OUT)
 
 clean:
 	rm -f $(OBJ) crc crc64
+
+mrproper: clean
+	rm -f dep

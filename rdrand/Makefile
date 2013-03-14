@@ -33,6 +33,11 @@ configured: $(OUT)
 .cpp.o:
 	$(CXX) $(INCLUDES) $(CXXFLAGS) -c $< -o $@
 
+dep:
+	$(CXX) $(INCLUDES) $(CXXFLAGS) -msse4.2 -MM $(SRC) > $@
+
+include dep
+
 $(OUT): $(OBJ)
 	$(CXX) $(OBJ) $(LDFLAGS) $(LIBS) -o $(OUT)
 
@@ -41,3 +46,4 @@ clean:
 
 mrproper: clean
 	rm -f *.dat
+	rm -f dep
