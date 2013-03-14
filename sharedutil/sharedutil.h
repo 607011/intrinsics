@@ -33,13 +33,13 @@ inline unsigned int _rdrand64_step(uint64_t* x) {
   return __builtin_ia32_rdrand64_step(reinterpret_cast<long long unsigned int*>(x));
 }
 // check with http://www.ibiblio.org/gferg/ldp/GCC-Inline-Assembly-HOWTO.html
-inline volatile void __get_cpuidex(uint32_t infoType, uint32_t ecxInput, uint32_t& eax, uint32_t& ebx, uint32_t& ecx, uint32_t& ecx) {
-  asm volatile (
-    "cpuid\n"
-		: /* output operands */ "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
-		:	/* input operands  */ "a" (infoType), "c" (ecxInput)
-    : /* list of clobbered registers */);
-}
+#define __get_cpuidex(infoType, ecxInput, eax, ebx, ecx, edx) \
+  __asm__ ( \
+	   "cpuid\n\t" \
+	   : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) \
+	   : "a"(infoType), "c"(ecxInput) \
+	    )
+
 #endif
 
 

@@ -30,7 +30,7 @@ x64-debug:
 
 configured: $(OUT)
 
-.cpp.o:
+.cpp.o: sharedutil.h
 	$(CXX) $(INCLUDES) $(CXXFLAGS) -c $< -o $@
 
 $(OUT): $(OBJ)
