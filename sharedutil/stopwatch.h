@@ -10,29 +10,31 @@
 #include "gnutypes.h"
 #endif
 
+#include <limits>
+
 #if defined(__GNUC__)
 inline volatile uint64_t __rdtsc(void) {
   uint32_t lo, hi;
   asm volatile (
     "cpuid\n"
-		"rdtsc\n"
-		"mov %%edx, %0\n"
-		"mov %%eax, %1\n"
-		: "=r" (hi), "=r" (lo)
-		:
-		: "%rax", "%rbx", "%rcx", "%rdx");
+    "rdtsc\n"
+    "mov %%edx, %0\n"
+    "mov %%eax, %1\n"
+    : "=r" (hi), "=r" (lo)
+    :
+  : "%rax", "%rbx", "%rcx", "%rdx");
   return (uint64_t)hi << 32 | lo;
 }
 inline volatile uint64_t __rdtscp(void) {
   uint32_t lo, hi;
   asm volatile (
     "rdtscp\n"
-		"mov %%edx, %0\n"
-		"mov %%eax, %1\n"
-		"cpuid\n"
-		: "=r" (hi), "=r" (lo)
-		:
-		: "%rax", "%rbx", "%rcx", "%rdx");
+    "mov %%edx, %0\n"
+    "mov %%eax, %1\n"
+    "cpuid\n"
+    : "=r" (hi), "=r" (lo)
+    :
+  : "%rax", "%rbx", "%rcx", "%rdx");
   return (uint64_t)hi << 32 | lo;
 }
 #include <time.h>
@@ -41,7 +43,7 @@ inline volatile uint64_t __rdtscp(void) {
 #endif
 
 class Stopwatch {
- public:
+public:
   inline Stopwatch(int64_t& dTime, int64_t& dTicks)
     : mT(dTime)
     , mTicks(dTicks)
@@ -73,7 +75,7 @@ class Stopwatch {
     LARGE_INTEGER pc, freq;
     QueryPerformanceCounter(&pc);
     QueryPerformanceFrequency(&freq);
-    mT = 1000 * (pc.QuadPart - mPC0.QuadPart) / freq.QuadPart;
+    mT = RESOLUTION * (pc.QuadPart - mPC0.QuadPart) / freq.QuadPart;
 #else
     mT = currentMS() - mPC0;
 #endif
@@ -83,13 +85,35 @@ class Stopwatch {
   inline int64_t currentMS(void) const {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
-    return (int64_t)t.tv_sec * 1000 + (int64_t)t.tv_nsec / 1000000;
+    return RESOLUTION * (int64_t)t.tv_sec + RESOLUTION / 1000000000 * (int64_t)t.tv_nsec;
   }
 #endif
 
+  static int64_t getAccuracy(void)
+  {
+    int64_t dt = 0;
+    int64_t ticks = 0;
+    int64_t tbest = LLONG_MAX;
+    Stopwatch stopwatch(dt, ticks);
+    for (int i = 0; i < 1000; ++i) {
+      do {
+        stopwatch.start();
+        do {
+          stopwatch.stop();
+        }
+        while (dt == 0);
+      }
+      while (dt < 0); // nochmal, falls Timer "gestolpert" ist
+      if (dt < tbest)
+        tbest = dt;
+    }
+    return tbest;
+  }
+
   static const int64_t INVALID = -1;
-  
- private:
+  static const int64_t RESOLUTION = 1000000; // 1/RESOLUTION s
+
+private:
   int64_t& mT;
   int64_t& mTicks;
 #if defined(WIN32)
