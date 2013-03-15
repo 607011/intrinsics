@@ -44,8 +44,8 @@ CPUFeatures::CPUFeatures(void)
 #endif
     LogicalProcessorData data = {
       ((r.ebx >> 24) & 0xff),
-      ((r.edx >> 28) & 0x1) == 0x1,
-      threads_per_package // ((r.ebx >> 16) & 0xff)
+      threads_per_package,
+      ((r.edx >> 28) & 0x1) == 0x1
     };
     logical_cpu_data.push_back(data);
   }

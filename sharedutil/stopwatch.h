@@ -81,11 +81,11 @@ public:
 #endif
   }
 
-#ifndef WIN32
+#if defined(__GNUC__)
   inline int64_t currentMS(void) const {
     struct timespec t;
-    clock_gettime(CLOCK_MONOTONIC, &t);
-    return RESOLUTION * (int64_t)t.tv_sec + RESOLUTION / 1000000000 * (int64_t)t.tv_nsec;
+    clock_gettime(CLOCK_MONOTONIC, &t);                                       
+    return RESOLUTION * (int64_t)t.tv_sec + RESOLUTION * (int64_t)t.tv_nsec / 1000000000LL;
   }
 #endif
 
@@ -111,7 +111,11 @@ public:
   }
 
   static const int64_t INVALID = -1;
+#if defined(WIN32)
   static const int64_t RESOLUTION = 1000000; // 1/RESOLUTION s
+#elif defined(__GNUC__)
+  static const int64_t RESOLUTION = 1000;    // 1/RESOLUTION s
+#endif
 
 private:
   int64_t& mT;

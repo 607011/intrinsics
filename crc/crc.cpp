@@ -337,7 +337,7 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
   std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
   std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
   std::cout << "0x" << std::setfill('0') << std::hex << std::setw(8) << pResult[0].crc
-    << std::setfill(' ') << std::setw(10) << std::dec << 1000*tMin/Stopwatch::RESOLUTION << " ms  " 
+    << std::setfill(' ') << std::setw(10) << std::dec << tMin << " ms  " 
     << std::fixed << std::setprecision(2) << std::setw(8)
     << (float)gRngBufSize*gIterations/1024/1024/((float)t/Stopwatch::RESOLUTION)*numThreads << " MB/s"
     << std::setw(8) << (float)pResult[0].ticks / gRngBufSize
@@ -565,9 +565,11 @@ int main(int argc, char* argv[]) {
       << B[CPUFeatures::instance().aes_supported] << std::endl
       << std::endl;
 
+    /*
     std::cout << "Genauigkeit der Stoppuhr: "
       << 1e-6f * (float)Stopwatch::getAccuracy() * Stopwatch::RESOLUTION << " micro secs" << std::endl
       << std::endl;
+    */
   }
 
   if (gVerbose == 3)
