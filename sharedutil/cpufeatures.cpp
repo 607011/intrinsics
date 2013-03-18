@@ -198,16 +198,32 @@ int CPUFeatures::getNumCores(void) const
 }
 
 
-void CPUFeatures::lockToLogicalProcessor(int core) const
+void CPUFeatures::lockToLogicalProcessor(int core)
+{
+  if (core < 0) {
+    CPUFeatures::unlockFromLogicalProcessor();
+  }
+  else {
+#if defined(WIN32)
+    DWORD_PTR affinityMask = 1U << core;
+    SetThreadAffinityMask(GetCurrentThread(), affinityMask);
+#elif defined(__GNUC__)
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core, &cpuset);
+    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+#endif
+  }
+}
+
+
+void CPUFeatures::unlockFromLogicalProcessor(void)
 {
 #if defined(WIN32)
-  DWORD_PTR affinityMask = 1U << core;
-  SetThreadAffinityMask(GetCurrentThread(), affinityMask);
+ SetThreadAffinityMask(GetCurrentThread(), 0);
 #elif defined(__GNUC__)
-  // set CPU affinity
   cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
-  CPU_SET(core, &cpuset);
   pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
 #endif
 }

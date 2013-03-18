@@ -33,7 +33,6 @@ private: // Singleton
   void detectVendor(void);
   void detectFeatures(void);
   void getCoresForCurrentProcessor(unsigned int& nCores, unsigned int& nThreadsPerCore);
-  void lockToLogicalProcessor(int core) const;
 
 public:
   static CPUFeatures& instance(void) { 
@@ -46,6 +45,8 @@ public:
   bool isRdRandSupported(void) const;
   void evaluateCPUFeatures(void);
   int getNumCores(void) const;
+  static void lockToLogicalProcessor(int core);
+  static void unlockFromLogicalProcessor(void);
 
 #if defined(WIN32)
   int count(int& numaNodeCount, int& processorCoreCount, int& logicalProcessorCount, int& processorPackageCount);

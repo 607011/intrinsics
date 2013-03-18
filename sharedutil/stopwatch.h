@@ -91,6 +91,7 @@ public:
 
   static int64_t getAccuracy(void)
   {
+    CPUFeatures::lockToLogicalProcessor(0);
     int64_t dt = 0;
     int64_t ticks = 0;
     int64_t tbest = LLONG_MAX;
@@ -107,6 +108,7 @@ public:
       if (dt < tbest)
         tbest = dt;
     }
+    CPUFeatures::unlockFromLogicalProcessor();
     return tbest;
   }
 
