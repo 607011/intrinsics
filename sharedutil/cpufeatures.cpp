@@ -315,6 +315,10 @@ bool CPUFeatures::isCRCSupported(void) const {
 }
 
 
+bool CPUFeatures::isAESSupported(void) const {
+  return isGenuineIntelCPU() && aes_supported;
+}
+
 bool CPUFeatures::isRdRandSupported(void) const {
   return isGenuineIntelCPU() && rdrand_supported;
 }

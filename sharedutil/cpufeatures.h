@@ -42,6 +42,7 @@ public:
   bool isGenuineIntelCPU(void) const;
   bool isAuthenticAMDCPU(void) const;
   bool isCRCSupported(void) const;
+  bool isAESSupported(void) const;
   bool isRdRandSupported(void) const;
   void evaluateCPUFeatures(void);
   int getNumCores(void) const;
