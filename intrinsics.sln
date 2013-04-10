@@ -28,6 +28,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "aes", "aes\aes.vcxproj", "{
 		{601D70AC-2050-4E38-A10C-B4F69298D5BA} = {601D70AC-2050-4E38-A10C-B4F69298D5BA}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "aesnilib", "aesnilib\aesnilib.vcxproj", "{9918BC7B-3708-491C-AE61-4495E014D723}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -120,6 +122,16 @@ Global
 		{F557CEC7-8983-42ED-BA1F-5D397E9296BC}.Release|Win32.ActiveCfg = Release|Win32
 		{F557CEC7-8983-42ED-BA1F-5D397E9296BC}.Release|Win32.Build.0 = Release|Win32
 		{F557CEC7-8983-42ED-BA1F-5D397E9296BC}.Release|x64.ActiveCfg = Release|Win32
+		{9918BC7B-3708-491C-AE61-4495E014D723}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{9918BC7B-3708-491C-AE61-4495E014D723}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{9918BC7B-3708-491C-AE61-4495E014D723}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9918BC7B-3708-491C-AE61-4495E014D723}.Debug|Win32.Build.0 = Debug|Win32
+		{9918BC7B-3708-491C-AE61-4495E014D723}.Debug|x64.ActiveCfg = Debug|Win32
+		{9918BC7B-3708-491C-AE61-4495E014D723}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{9918BC7B-3708-491C-AE61-4495E014D723}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{9918BC7B-3708-491C-AE61-4495E014D723}.Release|Win32.ActiveCfg = Release|Win32
+		{9918BC7B-3708-491C-AE61-4495E014D723}.Release|Win32.Build.0 = Release|Win32
+		{9918BC7B-3708-491C-AE61-4495E014D723}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

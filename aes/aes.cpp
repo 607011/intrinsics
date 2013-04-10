@@ -3,7 +3,7 @@
 
 #if defined(WIN32)
 #include <Windows.h>
-#include <nmmintrin.h>
+#include <wmmintrin.h>
 #endif
 
 #include <iostream>
@@ -17,6 +17,7 @@
 #include "mersenne_twister.h"
 #include "stopwatch.h"
 #include "cpufeatures.h"
+#include "aesni.h"
 
 #if defined(__GNUC__)
 #include <string.h>
@@ -33,7 +34,7 @@ typedef void* LPVOID;
 #include <smmintrin.h>
 #endif
 static const int DEFAULT_ITERATIONS = 16;
-static const int DEFAULT_inBuf_SIZE = 128;
+static const int DEFAULT_BUF_SIZE = 128;
 static const int DEFAULT_NUM_THREADS = 1;
 static const int MAX_NUM_THREADS = 256;
 
@@ -56,8 +57,9 @@ std::string CoreBindingString[_LastCoreBinding] =
 };
 
 int gIterations = DEFAULT_ITERATIONS;
-uint8_t* ginBuf = NULL;
-int ginBufSize = DEFAULT_inBuf_SIZE;
+uint8_t* gInBuf = NULL;
+uint8_t* gOutBuf = NULL;
+int gBufSize = DEFAULT_BUF_SIZE;
 int gNumThreads[MAX_NUM_THREADS] = { DEFAULT_NUM_THREADS };
 int gMaxNumThreads = 1;
 int gThreadIterations = 0;
@@ -65,6 +67,18 @@ int gThreadPriority;
 int gNumSockets = 1;
 int gVerbose = 0;
 CoreBinding gCoreBinding = AutomaticCoreBinding;
+
+ALIGN16 uint8_t AES_CBC_IV[] = {0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f};
+
+ALIGN16 uint8_t AES128_TEST_KEY[] = {0x7E,0x24,0x06,0x78,0x17,0xFA,0xE0,0xD7,0x43,0xD6,0xCE,0x1F,0x32,0x53,0x91,0x63};
+ALIGN16 uint8_t AES192_TEST_KEY[] = {0x7C,0x5C,0xB2,0x40,0x1B,0x3D,0xC3,0x3C,0x19,0xE7,0x34,0x08,0x19,0xE0,0xF6,0x9C,0x67,0x8C,0x3D,0xB8,0xE6,0xF6,0xA9,0x1A};
+ALIGN16 uint8_t AES256_TEST_KEY[] = {0xF6,0xD6,0x6D,0x6B,0xD5,0x2D,0x59,0xBB,0x07,0x96,0x36,0x58,0x79,0xEF,0xF8,0x86,0xC6,0x6D,0xD5,0x1A,0x5B,0x6A,0x99,0x74,0x4B,0x50,0x59,0x0C,0x87,0xA2,0x38,0x84};
+
+ALIGN16 uint8_t AES_TEST_VECTOR[] = {0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1A,0x1B,0x1C,0x1D,0x1E,0x1F};
+
+ALIGN16 uint8_t CBC128_EXPECTED[] = {0x76,0x49,0xab,0xac,0x81,0x19,0xb2,0x46,0xce,0xe9,0x8e,0x9b,0x12,0xe9,0x19,0x7d,0x50,0x86,0xcb,0x9b,0x50,0x72,0x19,0xee,0x95,0xdb,0x11,0x3a,0x91,0x76,0x78,0xb2,0x73,0xbe,0xd6,0xb8,0xe3,0xc1,0x74,0x3b,0x71,0x16,0xe6,0x9e,0x22,0x22,0x95,0x16,0x3f,0xf1,0xca,0xa1,0x68,0x1f,0xac,0x09,0x12,0x0e,0xca,0x30,0x75,0x86,0xe1,0xa7};
+ALIGN16 uint8_t CBC192_EXPECTED[] = {0x4f,0x02,0x1d,0xb2,0x43,0xbc,0x63,0x3d,0x71,0x78,0x18,0x3a,0x9f,0xa0,0x71,0xe8,0xb4,0xd9,0xad,0xa9,0xad,0x7d,0xed,0xf4,0xe5,0xe7,0x38,0x76,0x3f,0x69,0x14,0x5a,0x57,0x1b,0x24,0x20,0x12,0xfb,0x7a,0xe0,0x7f,0xa9,0xba,0xac,0x3d,0xf1,0x02,0xe0,0x08,0xb0,0xe2,0x79,0x88,0x59,0x88,0x81,0xd9,0x20,0xa9,0xe6,0x4f,0x56,0x15,0xcd};
+ALIGN16 uint8_t CBC256_EXPECTED[] = {0xf5,0x8c,0x4c,0x04,0xd6,0xe5,0xf1,0xba,0x77,0x9e,0xab,0xfb,0x5f,0x7b,0xfb,0xd6,0x9c,0xfc,0x4e,0x96,0x7e,0xdb,0x80,0x8d,0x67,0x9f,0x77,0x7b,0xc6,0x70,0x2c,0x7d,0x39,0xf2,0x33,0x69,0xa9,0xd9,0xba,0xcf,0xa5,0x30,0xe2,0x63,0x04,0x23,0x14,0x61,0xb2,0xeb,0x05,0xe2,0xc3,0x9b,0xe9,0xfc,0xda,0x6c,0x19,0x07,0x8c,0x6a,0x9d,0x1b};
 
 struct AesResult {
   int nThreads;
@@ -112,7 +126,7 @@ struct BenchmarkResult {
   Method method;
   uint8_t* inBuf;
   uint8_t* outBuf;
-  int inBufSize;
+  int bufSize;
   int num;
   HANDLE hThread;
   int iterations;
@@ -121,7 +135,6 @@ struct BenchmarkResult {
   // output fields
   int64_t t;
   int64_t ticks;
-  uint32_t crc;
 };
 
 
@@ -194,10 +207,10 @@ void*
       {
       case AES128:
         {
-          uint8_t* rn = (uint8_t*)result->inBuf + result->num * result->inBufSize / sizeof(uint8_t);
-          const uint8_t* const rne = (uint8_t*)rn + result->inBufSize / sizeof(uint8_t);
-          //while (rn < rne)
-          //  crc = _mm_crc32_u8(crc, *rn++);
+          uint8_t* plain = (uint8_t*)result->inBuf + result->num * result->bufSize;
+          uint8_t* enc =  (uint8_t*)result->outBuf + result->num * result->bufSize;
+          /// AES_CBC_encrypt(const unsigned char* in, unsigned char* out, unsigned char ivec[16], unsigned long length, unsigned char* key, int number_of_rounds);
+          AES_CBC_encrypt(plain, enc, AES_CBC_IV, result->bufSize, AES128_TEST_KEY, 10);
           break;
         }
       }
@@ -226,8 +239,9 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
 #endif
   for (int i = 0; i < numThreads; ++i) {
     pResult[i].num = i;
-    pResult[i].inBuf = ginBuf;
-    pResult[i].inBufSize = ginBufSize;
+    pResult[i].inBuf = gInBuf;
+    pResult[i].outBuf = gOutBuf;
+    pResult[i].bufSize = gBufSize;
     pResult[i].iterations = gIterations;
     pResult[i].numCores = numCores;
     pResult[i].coreBinding = gCoreBinding;
@@ -240,7 +254,7 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
     hThread[i] = pResult[i].hThread; // hThread[] wird von WaitForMultipleObjects() benötigt
   }
   std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
-  std::cout << "Berechnen des CRC ...";
+  std::cout << "Verschluesselung ...";
 
 #if defined(WIN32)
   {
@@ -265,11 +279,10 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
 
   std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
   std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
-  std::cout << "0x" << std::setfill('0') << std::hex << std::setw(8) << pResult[0].crc
-    << std::setfill(' ') << std::setw(10) << std::dec << tMin << " ms  " 
+  std::cout << std::setfill(' ') << std::setw(10) << std::dec << tMin << " ms  " 
     << std::fixed << std::setprecision(2) << std::setw(8)
-    << (float)ginBufSize*gIterations/1024/1024/((float)t/Stopwatch::RESOLUTION)*numThreads << " MB/s"
-    << std::setw(8) << (float)pResult[0].ticks / ginBufSize
+    << (float)gBufSize*gIterations/1024/1024/((float)t/Stopwatch::RESOLUTION)*numThreads << " MB/s"
+    << std::setw(8) << (float)pResult[0].ticks / gBufSize
     << std::endl;
 
   delete [] pResult;
@@ -282,7 +295,7 @@ void usage(void) {
     << std::endl
     << "Optionen:" << std::endl
     << "  -n N" << std::endl
-    << "     N MByte große Blocks generieren (Vorgabe: " << DEFAULT_inBuf_SIZE << ")" << std::endl
+    << "     N MByte große Blocks generieren (Vorgabe: " << DEFAULT_BUF_SIZE << ")" << std::endl
     << std::endl
     << "  (--iterations|-i) N" << std::endl
     << "     Generieren N Mal wiederholen (Vorgabe: " << DEFAULT_ITERATIONS << ")" << std::endl
@@ -346,9 +359,9 @@ int main(int argc, char* argv[]) {
         usage();
         return EXIT_FAILURE;
       }
-      ginBufSize = atoi(optarg);
-      if (ginBufSize <= 0)
-        ginBufSize = DEFAULT_inBuf_SIZE;
+      gBufSize = atoi(optarg);
+      if (gBufSize <= 0)
+        gBufSize = DEFAULT_BUF_SIZE;
       break;
     case SELECT_NUM_SOCKETS:
       // fall-through
@@ -520,35 +533,36 @@ int main(int argc, char* argv[]) {
   MersenneTwister gen;
   gen.seed();
   if (gVerbose > 0)
-    std::cout << std::endl << "Generieren von " << gMaxNumThreads << "x" << ginBufSize << " MByte ..." << std::endl;
-  ginBufSize *= 1024*1024;
+    std::cout << std::endl << "Generieren von " << gMaxNumThreads << "x" << gBufSize << " MByte ..." << std::endl;
+  gBufSize *= 1024*1024;
   try {
-    ginBuf = new uint8_t[gMaxNumThreads * ginBufSize];
+    gInBuf = new uint8_t[gMaxNumThreads * gBufSize];
+    gOutBuf = new uint8_t[gMaxNumThreads * gBufSize];
   }
   catch(...) {
     std::cerr << "FEHLER: nicht genug freier Speicher!" << std::endl;
     return EXIT_FAILURE;
   }
-  if (ginBuf == NULL) {
+  if (gInBuf == NULL || gOutBuf == NULL) {
     std::cerr << "FEHLER beim Allozieren des Speichers!" << std::endl;
     return EXIT_FAILURE;
   }
-  uint32_t* rn = reinterpret_cast<uint32_t*>(ginBuf);
-  const uint32_t* const rne = rn + gMaxNumThreads * ginBufSize / sizeof(uint32_t);
+  uint32_t* rn = reinterpret_cast<uint32_t*>(gInBuf);
+  const uint32_t* const rne = rn + gMaxNumThreads * gBufSize / sizeof(uint32_t);
   while (rn < rne)
     gen.next(*rn++);
 
 #if defined(WIN32)
   SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 #endif
-  std::cout << "Bilden der Pruefsummen (" << gIterations << "x" << (ginBufSize/1024/1024) << " MByte) ..." << std::endl;
+  std::cout << "AES-Verschluesselung (" << gIterations << "x" << (gBufSize/1024/1024) << " MByte) ..." << std::endl;
   for (int i = 0; i <= gThreadIterations && gNumThreads[i] > 0 ; ++i) {
     const int numThreads = gNumThreads[i];
     std::cout << std::endl
       << "... in " << numThreads << " Thread" << (numThreads == 1? "" : "s") << ":" << std::endl
       << std::endl
-      << "  Methode             CRC             t/Block      Durchsatz  Zyklen" << std::endl
-      << "  ------------------------------------------------------------------" << std::endl;
+      << "  Methode                t/Block      Durchsatz  Zyklen" << std::endl
+      << "  -----------------------------------------------------" << std::endl;
     if (CPUFeatures::instance().isAESSupported()) {
       runBenchmark(numThreads, "AES128", AES128);
       runBenchmark(numThreads, "AES192", AES192);
@@ -576,7 +590,8 @@ int main(int argc, char* argv[]) {
   //    std::cerr << "FEHLER: unterschiedliche CRC-Ergebnisse!" << std::endl;
   //}
 
-  delete [] ginBuf;
+  delete [] gInBuf;
+  delete [] gOutBuf;
 
   return (correct)? EXIT_SUCCESS : EXIT_FAILURE;
 }
