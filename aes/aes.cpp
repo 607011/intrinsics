@@ -58,7 +58,8 @@ std::string CoreBindingString[_LastCoreBinding] =
 
 int gIterations = DEFAULT_ITERATIONS;
 uint8_t* gInBuf = NULL;
-uint8_t* gOutBuf = NULL;
+uint8_t* gEncBuf = NULL;
+uint8_t* gDecBuf = NULL;
 int gBufSize = DEFAULT_BUF_SIZE;
 int gNumThreads[MAX_NUM_THREADS] = { DEFAULT_NUM_THREADS };
 int gMaxNumThreads = 1;
@@ -80,13 +81,6 @@ ALIGN16 uint8_t CBC128_EXPECTED[] = {0x76,0x49,0xab,0xac,0x81,0x19,0xb2,0x46,0xc
 ALIGN16 uint8_t CBC192_EXPECTED[] = {0x4f,0x02,0x1d,0xb2,0x43,0xbc,0x63,0x3d,0x71,0x78,0x18,0x3a,0x9f,0xa0,0x71,0xe8,0xb4,0xd9,0xad,0xa9,0xad,0x7d,0xed,0xf4,0xe5,0xe7,0x38,0x76,0x3f,0x69,0x14,0x5a,0x57,0x1b,0x24,0x20,0x12,0xfb,0x7a,0xe0,0x7f,0xa9,0xba,0xac,0x3d,0xf1,0x02,0xe0,0x08,0xb0,0xe2,0x79,0x88,0x59,0x88,0x81,0xd9,0x20,0xa9,0xe6,0x4f,0x56,0x15,0xcd};
 ALIGN16 uint8_t CBC256_EXPECTED[] = {0xf5,0x8c,0x4c,0x04,0xd6,0xe5,0xf1,0xba,0x77,0x9e,0xab,0xfb,0x5f,0x7b,0xfb,0xd6,0x9c,0xfc,0x4e,0x96,0x7e,0xdb,0x80,0x8d,0x67,0x9f,0x77,0x7b,0xc6,0x70,0x2c,0x7d,0x39,0xf2,0x33,0x69,0xa9,0xd9,0xba,0xcf,0xa5,0x30,0xe2,0x63,0x04,0x23,0x14,0x61,0xb2,0xeb,0x05,0xe2,0xc3,0x9b,0xe9,0xfc,0xda,0x6c,0x19,0x07,0x8c,0x6a,0x9d,0x1b};
 
-struct AesResult {
-  int nThreads;
-  std::string method;
-};
-
-std::vector<AesResult> gAesResults;
-
 enum _long_options {
   SELECT_HELP,
   SELECT_CORE_BINDING,
@@ -102,11 +96,20 @@ static struct option long_options[] = {
   { "help",          no_argument,       0, SELECT_HELP },
 };
 
+static const unsigned int DecryptMode = 0x80000000U;
 enum Method {
-  AES128,
-  AES192,
-  AES256,
-  OpenSSL
+  AES128Enc = 1 << 0,
+  AES192Enc = 1 << 1,
+  AES256Enc = 1 << 2,
+  OpenSSL128Enc = 1 << 3,
+  OpenSSL192Enc = 1 << 4,
+  OpenSSL256Enc = 1 << 5,
+  AES128Dec = AES128Enc | DecryptMode,
+  AES192Dec = AES192Enc | DecryptMode,
+  AES256Dec = AES256Enc | DecryptMode,
+  OpenSSL128Dec = OpenSSL128Enc | DecryptMode,
+  OpenSSL192Dec = OpenSSL192Enc | DecryptMode,
+  OpenSSL256Dec = OpenSSL256Enc | DecryptMode
 };
 
 struct BenchmarkResult {
@@ -124,10 +127,13 @@ struct BenchmarkResult {
   }
   // input fields
   Method method;
+  AES_KEY encKey;
+  AES_KEY decKey;
   uint8_t* inBuf;
-  uint8_t* outBuf;
+  uint8_t* encBuf;
+  uint8_t* decBuf;
   int bufSize;
-  int num;
+  int threadNum;
   HANDLE hThread;
   int iterations;
   int numCores;
@@ -148,7 +154,7 @@ void*
 {
   BenchmarkResult* result = (BenchmarkResult*)lpParameter;
   if (result->coreBinding != NoCoreBinding) {
-    int core = result->num % result->numCores;
+    int core = result->threadNum % result->numCores;
     switch (result->coreBinding) {
     case EvenFirstCoreBinding:
       {
@@ -188,29 +194,30 @@ void*
     pthread_attr_destroy(&tattr);
 #endif
   }
-
   int64_t tMin = LLONG_MAX;
   int64_t ticksMin = LLONG_MAX;
-  uint32_t crc = 0;
-#if defined(_M_X64) || defined(__x86_64__)
-  uint64_t crc64 = 0;
-#endif
   for (int i = 0; i < result->iterations; ++i) {
     int64_t t, ticks;
-    crc = 0;
-#if defined(_M_X64) || defined(__x86_64__)
-    crc64 = 0;
-#endif
     {
       Stopwatch stopwatch(t, ticks);
       switch (result->method)
       {
-      case AES128:
+      case AES128Enc:
+        // fall-through
+      case AES256Enc:
         {
-          uint8_t* plain = (uint8_t*)result->inBuf + result->num * result->bufSize;
-          uint8_t* enc =  (uint8_t*)result->outBuf + result->num * result->bufSize;
-          /// AES_CBC_encrypt(const unsigned char* in, unsigned char* out, unsigned char ivec[16], unsigned long length, unsigned char* key, int number_of_rounds);
-          AES_CBC_encrypt(plain, enc, AES_CBC_IV, result->bufSize, AES128_TEST_KEY, 10);
+          uint8_t* plain = (uint8_t*)result->inBuf + result->threadNum * result->bufSize;
+          uint8_t* enc = (uint8_t*)result->encBuf + result->threadNum * result->bufSize;
+          AES_CBC_encrypt(plain, enc, AES_CBC_IV, result->bufSize, result->encKey.KEY, result->encKey.nr);
+          break;
+        }
+      case AES128Dec:
+        // fall-through
+      case AES256Dec:
+        {
+          uint8_t* enc = (uint8_t*)result->encBuf + result->threadNum * result->bufSize;
+          uint8_t* dec = (uint8_t*)result->decBuf + result->threadNum * result->bufSize;
+          AES_CBC_decrypt(enc, dec, AES_CBC_IV, result->bufSize, result->decKey.KEY, result->decKey.nr);
           break;
         }
       }
@@ -237,10 +244,14 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
 #if defined(__GNUC__)
   Stopwatch stopwatch(t, ticks);
 #endif
+  std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
+  std::cout << ((method & DecryptMode)? "Entschluesselung" : "Verschluesselung") << " ...";
+
   for (int i = 0; i < numThreads; ++i) {
-    pResult[i].num = i;
+    pResult[i].threadNum = i;
     pResult[i].inBuf = gInBuf;
-    pResult[i].outBuf = gOutBuf;
+    pResult[i].encBuf = gEncBuf;
+    pResult[i].decBuf = gDecBuf;
     pResult[i].bufSize = gBufSize;
     pResult[i].iterations = gIterations;
     pResult[i].numCores = numCores;
@@ -251,10 +262,28 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
     pthread_create(&pResult[i].hThread, NULL, BenchmarkThreadProc, (void*)&pResult[i]);
 #endif
     pResult[i].method = method;
+    switch (method) {
+    case AES128Enc:
+      AES_set_encrypt_key(AES128_TEST_KEY, 128, &pResult[i].encKey);
+      break;
+    case AES192Enc:
+      AES_set_encrypt_key(AES192_TEST_KEY, 192, &pResult[i].encKey);
+      break;
+    case AES256Enc:
+      AES_set_encrypt_key(AES256_TEST_KEY, 256, &pResult[i].encKey);
+      break;
+    case AES128Dec:
+      AES_set_decrypt_key(AES128_TEST_KEY, 128, &pResult[i].decKey);
+      break;
+    case AES192Dec:
+      AES_set_decrypt_key(AES192_TEST_KEY, 192, &pResult[i].decKey);
+      break;
+    case AES256Dec:
+      AES_set_decrypt_key(AES256_TEST_KEY, 256, &pResult[i].decKey);
+      break;
+    }
     hThread[i] = pResult[i].hThread; // hThread[] wird von WaitForMultipleObjects() benötigt
   }
-  std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
-  std::cout << "Verschluesselung ...";
 
 #if defined(WIN32)
   {
@@ -269,17 +298,15 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
   stopwatch.stop();
 #endif
 
+  std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
   // Ergebnisse sammeln
-  AesResult result = { numThreads, strMethod };
-  gAesResults.push_back(result);
   int64_t tMin = pResult[0].t;
   for (int i = 1; i < numThreads; ++i)
     tMin += pResult[i].t;
   tMin /= numThreads;
 
-  std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
   std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
-  std::cout << std::setfill(' ') << std::setw(10) << std::dec << tMin << " ms  " 
+  std::cout << std::setfill(' ') << std::setw(8) << std::dec << tMin << " ms  " 
     << std::fixed << std::setprecision(2) << std::setw(8)
     << (float)gBufSize*gIterations/1024/1024/((float)t/Stopwatch::RESOLUTION)*numThreads << " MB/s"
     << std::setw(8) << (float)pResult[0].ticks / gBufSize
@@ -536,14 +563,15 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl << "Generieren von " << gMaxNumThreads << "x" << gBufSize << " MByte ..." << std::endl;
   gBufSize *= 1024*1024;
   try {
-    gInBuf = new uint8_t[gMaxNumThreads * gBufSize];
-    gOutBuf = new uint8_t[gMaxNumThreads * gBufSize];
+    gInBuf  = new uint8_t[gMaxNumThreads * gBufSize];
+    gEncBuf = new uint8_t[gMaxNumThreads * gBufSize];
+    gDecBuf = new uint8_t[gMaxNumThreads * gBufSize];
   }
   catch(...) {
     std::cerr << "FEHLER: nicht genug freier Speicher!" << std::endl;
     return EXIT_FAILURE;
   }
-  if (gInBuf == NULL || gOutBuf == NULL) {
+  if (gInBuf == NULL || gEncBuf == NULL || gDecBuf == NULL) {
     std::cerr << "FEHLER beim Allozieren des Speichers!" << std::endl;
     return EXIT_FAILURE;
   }
@@ -555,7 +583,8 @@ int main(int argc, char* argv[]) {
 #if defined(WIN32)
   SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 #endif
-  std::cout << "AES-Verschluesselung (" << gIterations << "x" << (gBufSize/1024/1024) << " MByte) ..." << std::endl;
+  bool correct = false;
+  std::cout << "Ver- und Entschluesselung (" << gIterations << "x" << (gBufSize/1024/1024) << " MByte) ..." << std::endl;
   for (int i = 0; i <= gThreadIterations && gNumThreads[i] > 0 ; ++i) {
     const int numThreads = gNumThreads[i];
     std::cout << std::endl
@@ -564,34 +593,26 @@ int main(int argc, char* argv[]) {
       << "  Methode                t/Block      Durchsatz  Zyklen" << std::endl
       << "  -----------------------------------------------------" << std::endl;
     if (CPUFeatures::instance().isAESSupported()) {
-      runBenchmark(numThreads, "AES128", AES128);
-      runBenchmark(numThreads, "AES192", AES192);
-      runBenchmark(numThreads, "AES256", AES256);
+      runBenchmark(numThreads, "AES128", AES128Enc);
+      runBenchmark(numThreads, "AES128", AES128Dec);
+      correct = memcmp(gInBuf, gDecBuf, gBufSize) == 0;
+      std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl;
+#if defined(USE_AES_192)
+      runBenchmark(numThreads, "AES192", AES192Enc);
+      runBenchmark(numThreads, "AES192", AES192Dec);
+      correct = memcmp(gInBuf, gDecBuf, gBufSize) == 0;
+      std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl;
+#endif
+      runBenchmark(numThreads, "AES256", AES256Enc);
+      runBenchmark(numThreads, "AES256", AES256Dec);
+      correct = memcmp(gInBuf, gDecBuf, gBufSize) == 0;
+      std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl;
     }
   }
 
-  //if (gVerbose > 1) 
-  //  std::cout << std::endl;
-  bool correct = true;
-  //const uint32_t crc = gAesResults.begin()->crc;
-  //for (std::vector<AesResult>::const_iterator i = gAesResults.begin(); i != gAesResults.end() && correct; ++i) {
-  //  correct = (i->crc == crc);
-  //  if (gVerbose > 1)
-  //    std::cout << "Pruefen des Ergebnisses von Methode '" << i->method
-  //    << "' in " << i->nThreads << " Threads ..."
-  //    << ((correct)? "OK" : "FEHLER") << std::endl;
-  //}
-
-  //if (gVerbose > 0) {
-  //  std::cout << std::endl;
-  //  if (correct)
-  //    std::cout << "OK." << std::endl;
-  //  else 
-  //    std::cerr << "FEHLER: unterschiedliche CRC-Ergebnisse!" << std::endl;
-  //}
-
   delete [] gInBuf;
-  delete [] gOutBuf;
+  delete [] gEncBuf;
+  delete [] gDecBuf;
 
   return (correct)? EXIT_SUCCESS : EXIT_FAILURE;
 }
