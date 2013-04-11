@@ -261,45 +261,155 @@ int AES_set_decrypt_key(const unsigned char *userKey, const int bits, AES_KEY *k
   return 0;
 }
 
-void AES_CBC_encrypt(const unsigned char* in,
-                     unsigned char* out,
-                     unsigned char ivec[16],
-                     unsigned long length,
-                     unsigned char* key,
-                     int number_of_rounds)
+void AES_CBC_encrypt(const unsigned char* in, unsigned char* out,
+                     unsigned char ivec[16], unsigned long length,
+                     unsigned char* key, int number_of_rounds)
 {
+  assert(number_of_rounds == 10 || number_of_rounds == 12 || number_of_rounds == 14);
   length = (length % 16)? length / 16 + 1 : length / 16;
-  __m128i feedback = _mm_loadu_si128 ((__m128i*)ivec);
-  for (unsigned long i = 0; i < length; ++i){
-    __m128i data = _mm_loadu_si128(&((__m128i*)in)[i]);
-    feedback = _mm_xor_si128(data, feedback);
-    feedback = _mm_xor_si128(feedback, ((__m128i*)key)[0]);
-    int j;
-    for (j = 1; j < number_of_rounds; ++j)
-      feedback = _mm_aesenc_si128(feedback, ((__m128i*)key)[j]);
-    feedback = _mm_aesenclast_si128(feedback, ((__m128i*)key)[j]);
-    _mm_storeu_si128(&((__m128i*)out)[i], feedback);
+  __m128i* plain = (__m128i*)in;
+  const __m128i* const plainEnd = plain + length;
+  __m128i* enc = (__m128i*)out;
+  const __m128i* const k = (__m128i*)key;
+  __m128i feedback = _mm_loadu_si128((__m128i*)ivec);
+  switch (number_of_rounds) {
+  case 10:
+    while (plain < plainEnd) {
+      __m128i data = _mm_loadu_si128(plain++);
+      feedback = _mm_xor_si128(data, feedback);
+      feedback = _mm_xor_si128(feedback, k[0]);
+      feedback = _mm_aesenc_si128(feedback, k[1]);
+      feedback = _mm_aesenc_si128(feedback, k[2]);
+      feedback = _mm_aesenc_si128(feedback, k[3]);
+      feedback = _mm_aesenc_si128(feedback, k[4]);
+      feedback = _mm_aesenc_si128(feedback, k[5]);
+      feedback = _mm_aesenc_si128(feedback, k[6]);
+      feedback = _mm_aesenc_si128(feedback, k[7]);
+      feedback = _mm_aesenc_si128(feedback, k[8]);
+      feedback = _mm_aesenc_si128(feedback, k[9]);
+      feedback = _mm_aesenclast_si128(feedback, k[10]);
+      _mm_storeu_si128(enc++, feedback);
+    }
+    break;
+  case 12:
+    while (plain < plainEnd) {
+      __m128i data = _mm_loadu_si128(plain++);
+      feedback = _mm_xor_si128(data, feedback);
+      feedback = _mm_xor_si128(feedback, k[0]);
+      feedback = _mm_aesenc_si128(feedback, k[1]);
+      feedback = _mm_aesenc_si128(feedback, k[2]);
+      feedback = _mm_aesenc_si128(feedback, k[3]);
+      feedback = _mm_aesenc_si128(feedback, k[4]);
+      feedback = _mm_aesenc_si128(feedback, k[5]);
+      feedback = _mm_aesenc_si128(feedback, k[6]);
+      feedback = _mm_aesenc_si128(feedback, k[7]);
+      feedback = _mm_aesenc_si128(feedback, k[8]);
+      feedback = _mm_aesenc_si128(feedback, k[9]);
+      feedback = _mm_aesenc_si128(feedback, k[10]);
+      feedback = _mm_aesenc_si128(feedback, k[11]);
+      feedback = _mm_aesenclast_si128(feedback, k[12]);
+      _mm_storeu_si128(enc++, feedback);
+    }
+    break;
+  case 14:
+    while (plain < plainEnd) {
+      __m128i data = _mm_loadu_si128(plain++);
+      feedback = _mm_xor_si128(data, feedback);
+      feedback = _mm_xor_si128(feedback, k[0]);
+      feedback = _mm_aesenc_si128(feedback, k[1]);
+      feedback = _mm_aesenc_si128(feedback, k[2]);
+      feedback = _mm_aesenc_si128(feedback, k[3]);
+      feedback = _mm_aesenc_si128(feedback, k[4]);
+      feedback = _mm_aesenc_si128(feedback, k[5]);
+      feedback = _mm_aesenc_si128(feedback, k[6]);
+      feedback = _mm_aesenc_si128(feedback, k[7]);
+      feedback = _mm_aesenc_si128(feedback, k[8]);
+      feedback = _mm_aesenc_si128(feedback, k[9]);
+      feedback = _mm_aesenc_si128(feedback, k[10]);
+      feedback = _mm_aesenc_si128(feedback, k[11]);
+      feedback = _mm_aesenc_si128(feedback, k[12]);
+      feedback = _mm_aesenc_si128(feedback, k[13]);
+      feedback = _mm_aesenclast_si128(feedback, k[14]);
+      _mm_storeu_si128(enc++, feedback);
+    }
+    break;
   }
 }
 
-void AES_CBC_decrypt(const unsigned char* in,
-                     unsigned char* out,
-                     unsigned char ivec[16],
-                     unsigned long length,
-                     unsigned char* key,
-                     int number_of_rounds)
+void AES_CBC_decrypt(const unsigned char* in, unsigned char* out,
+                     unsigned char ivec[16], unsigned long length,
+                     unsigned char* key, int number_of_rounds)
 {
+  assert(number_of_rounds == 10 || number_of_rounds == 12 || number_of_rounds == 14);
   length = (length % 16)? length / 16 + 1 : length / 16;
+  __m128i* enc = (__m128i*)in;
+  const __m128i* const encEnd = enc + length;
+  __m128i* dec = (__m128i*)out;
+  const __m128i* const k = (__m128i*)key;
   __m128i feedback = _mm_loadu_si128((__m128i*)ivec);
-  for (unsigned long i = 0; i < length; ++i) {
-    __m128i last_in = _mm_loadu_si128(&((__m128i*)in)[i]);
-    __m128i data = _mm_xor_si128(last_in, ((__m128i*)key)[0]);
-    int j;
-    for (j = 1; j < number_of_rounds; ++j)
-      data = _mm_aesdec_si128(data, ((__m128i*)key)[j]);
-    data = _mm_aesdeclast_si128(data, ((__m128i*)key)[j]);
-    data = _mm_xor_si128(data, feedback);
-    _mm_storeu_si128(&((__m128i*)out)[i], data);
-    feedback = last_in;
+  switch (number_of_rounds) {
+  case 10:
+    while (enc < encEnd) {
+      __m128i last_in = _mm_loadu_si128(enc++);
+      __m128i data = _mm_xor_si128(last_in, k[0]);
+      data = _mm_aesdec_si128(data, k[1]);
+      data = _mm_aesdec_si128(data, k[2]);
+      data = _mm_aesdec_si128(data, k[3]);
+      data = _mm_aesdec_si128(data, k[4]);
+      data = _mm_aesdec_si128(data, k[5]);
+      data = _mm_aesdec_si128(data, k[6]);
+      data = _mm_aesdec_si128(data, k[7]);
+      data = _mm_aesdec_si128(data, k[8]);
+      data = _mm_aesdec_si128(data, k[9]);
+      data = _mm_aesdeclast_si128(data, k[10]);
+      data = _mm_xor_si128(data, feedback);
+      _mm_storeu_si128(dec++, data);
+      feedback = last_in;
+    }
+    break;
+  case 12:
+    while (enc < encEnd) {
+      __m128i last_in = _mm_loadu_si128(enc++);
+      __m128i data = _mm_xor_si128(last_in, k[0]);
+      data = _mm_aesdec_si128(data, k[1]);
+      data = _mm_aesdec_si128(data, k[2]);
+      data = _mm_aesdec_si128(data, k[3]);
+      data = _mm_aesdec_si128(data, k[4]);
+      data = _mm_aesdec_si128(data, k[5]);
+      data = _mm_aesdec_si128(data, k[6]);
+      data = _mm_aesdec_si128(data, k[7]);
+      data = _mm_aesdec_si128(data, k[8]);
+      data = _mm_aesdec_si128(data, k[9]);
+      data = _mm_aesdec_si128(data, k[10]);
+      data = _mm_aesdec_si128(data, k[11]);
+      data = _mm_aesdeclast_si128(data, k[12]);
+      data = _mm_xor_si128(data, feedback);
+      _mm_storeu_si128(dec++, data);
+      feedback = last_in;
+    }
+    break;
+  case 14:
+    while (enc < encEnd) {
+      __m128i last_in = _mm_loadu_si128(enc++);
+      __m128i data = _mm_xor_si128(last_in, k[0]);
+      data = _mm_aesdec_si128(data, k[1]);
+      data = _mm_aesdec_si128(data, k[2]);
+      data = _mm_aesdec_si128(data, k[3]);
+      data = _mm_aesdec_si128(data, k[4]);
+      data = _mm_aesdec_si128(data, k[5]);
+      data = _mm_aesdec_si128(data, k[6]);
+      data = _mm_aesdec_si128(data, k[7]);
+      data = _mm_aesdec_si128(data, k[8]);
+      data = _mm_aesdec_si128(data, k[9]);
+      data = _mm_aesdec_si128(data, k[10]);
+      data = _mm_aesdec_si128(data, k[11]);
+      data = _mm_aesdec_si128(data, k[12]);
+      data = _mm_aesdec_si128(data, k[13]);
+      data = _mm_aesdeclast_si128(data, k[14]);
+      data = _mm_xor_si128(data, feedback);
+      _mm_storeu_si128(dec++, data);
+      feedback = last_in;
+    }
+    break;
   }
 }
