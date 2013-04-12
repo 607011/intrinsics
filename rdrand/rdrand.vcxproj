@@ -257,7 +257,7 @@
       </IgnoreSpecificDefaultLibraries>
     </Link>
     <PostBuildEvent>
-      <Command>copy $(TargetDir)$(TargetFileName) "P:\rdrand\64 Bit\rdrand-64.exe"</Command>
+      <Command>rem copy $(TargetDir)$(TargetFileName) "P:\rdrand\64 Bit\rdrand-64.exe"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release SSE4.2|x64'">

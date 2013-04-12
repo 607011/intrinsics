@@ -306,7 +306,7 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
   tMin /= numThreads;
 
   std::cout.setf(std::ios_base::right, std::ios_base::adjustfield);
-  std::cout << std::setfill(' ') << std::setw(8) << std::dec << tMin << " ms  " 
+  std::cout << std::setfill(' ') << std::setw(8) << std::dec << (1000*tMin/Stopwatch::RESOLUTION) << " ms  " 
     << std::fixed << std::setprecision(2) << std::setw(8)
     << (float)gBufSize*gIterations/1024/1024/((float)t/Stopwatch::RESOLUTION)*numThreads << " MB/s"
     << std::setw(8) << (float)pResult[0].ticks / gBufSize
