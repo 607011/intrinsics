@@ -149,6 +149,9 @@
   <ItemGroup>
     <ClCompile Include="aes.cpp" />
     <ClCompile Include="aesni.cpp" />
+    <ClCompile Include="openssl\aes-openssl.cpp" />
+    <ClCompile Include="openssl\aes_core.c" />
+    <ClCompile Include="openssl\cbc128.c" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\getopt\getopt.vcxproj">
@@ -163,6 +166,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aesni.h" />
+    <ClInclude Include="openssl\aes_locl.h" />
+    <ClInclude Include="openssl\e_os2.h" />
+    <ClInclude Include="openssl\modes.h" />
+    <ClInclude Include="openssl\opensslconf.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

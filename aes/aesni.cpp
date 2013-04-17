@@ -211,16 +211,16 @@ int AES_set_encrypt_key(const unsigned char* userKey, const int bits, AES_KEY* k
   assert(key != NULL);
   switch (bits) {
   case 128:
-    AES_128_Key_Expansion(userKey, key->KEY);
-    key->nr = 10;
+    AES_128_Key_Expansion(userKey, key->rd_key);
+    key->rounds = 10;
     return 0;
   case 192:
-    AES_192_Key_Expansion(userKey, key->KEY);
-    key->nr = 12;
+    AES_192_Key_Expansion(userKey, key->rd_key);
+    key->rounds = 12;
     return 0;
   case 256:
-    AES_256_Key_Expansion(userKey, key->KEY);
-    key->nr = 14;
+    AES_256_Key_Expansion(userKey, key->rd_key);
+    key->rounds = 14;
     return 0;
   default:
     break;
@@ -231,14 +231,14 @@ int AES_set_encrypt_key(const unsigned char* userKey, const int bits, AES_KEY* k
 int AES_set_decrypt_key(const unsigned char *userKey, const int bits, AES_KEY *key)
 {
   AES_KEY temp_key;
-  __m128i *Key_Schedule = (__m128i*)key->KEY;
-  __m128i *Temp_Key_Schedule = (__m128i*)temp_key.KEY;
+  __m128i *Key_Schedule = (__m128i*)key->rd_key;
+  __m128i *Temp_Key_Schedule = (__m128i*)temp_key.rd_key;
   if (!userKey || !key)
     return -1;
   if (AES_set_encrypt_key(userKey,bits,&temp_key) == -2)
     return -2;
-  int nr = temp_key.nr;
-  key->nr = nr;
+  int nr = temp_key.rounds;
+  key->rounds = nr;
   Key_Schedule[nr] = Temp_Key_Schedule[0];
   Key_Schedule[nr-1] = _mm_aesimc_si128(Temp_Key_Schedule[1]);
   Key_Schedule[nr-2] = _mm_aesimc_si128(Temp_Key_Schedule[2]);
