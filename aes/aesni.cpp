@@ -7,6 +7,10 @@
 #include <assert.h>
 #include "aesni.h"
 
+#ifndef NULL
+#define NULL (0)
+#endif
+
 inline __m128i AES_128_ASSIST(__m128i temp1, __m128i temp2)
 {
   __m128i temp3;

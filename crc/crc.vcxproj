@@ -96,7 +96,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Developer\boost_1_53_0;$(IncludePath);$(SolutionDir)\sharedutil;$(SolutionDir)\getopt;$(SolutionDir)\rng</IncludePath>
+    <IncludePath>D:\Developer\boost_1_53_0;C:\Developer\boost_1_53_0;$(IncludePath);$(SolutionDir)\sharedutil;$(SolutionDir)\getopt;$(SolutionDir)\rng</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -104,7 +104,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\Developer\boost_1_53_0;$(IncludePath);$(SolutionDir)\rng;$(SolutionDir)\sharedutil;$(SolutionDir)\getopt</IncludePath>
+    <IncludePath>D:\Developer\boost_1_53_0;C:\Developer\boost_1_53_0;$(IncludePath);$(SolutionDir)\rng;$(SolutionDir)\sharedutil;$(SolutionDir)\getopt</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release SSE4.2|Win32'">
     <LinkIncremental>false</LinkIncremental>

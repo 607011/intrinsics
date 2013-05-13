@@ -625,8 +625,7 @@ static const u32 rcon[] = {
 /**
  * Expand the cipher key into the encryption key schedule.
  */
-int private_AES_set_encrypt_key(const unsigned char *userKey, const int bits,
-			AES_KEY *key) {
+int private_AES_set_encrypt_key(const unsigned char *userKey, const int bits, AES_KEY *key) {
 
 	u32 *rk;
    	int i = 0;
@@ -723,14 +722,12 @@ int private_AES_set_encrypt_key(const unsigned char *userKey, const int bits,
 	return 0;
 }
 
+
 /**
  * Expand the cipher key into the decryption key schedule.
  */
-int private_AES_set_decrypt_key(const unsigned char *userKey, const int bits,
-			 AES_KEY *key) {
-
-        u32 *rk;
-
+int private_AES_set_decrypt_key(const unsigned char *userKey, const int bits, AES_KEY *key) {
+  u32 *rk;
 	unsigned int i, j, status;
 	u32 temp;
 
@@ -774,6 +771,19 @@ int private_AES_set_decrypt_key(const unsigned char *userKey, const int bits,
 	}
 	return 0;
 }
+
+
+int AES_set_encrypt_key_OpenSSL(const unsigned char *userKey, const int bits, AES_KEY *key)
+{
+	return private_AES_set_encrypt_key(userKey, bits, key);
+}
+
+
+int AES_set_decrypt_key_OpenSSL(const unsigned char *userKey, const int bits, AES_KEY *key)
+{
+	return private_AES_set_decrypt_key(userKey, bits, key);
+}
+
 
 /*
  * Encrypt a single block
