@@ -22,6 +22,61 @@ bool hasRand_s(void);
 
 
 #if defined(__GNUC__)
+inline void* _aligned_malloc(size_t size, size_t alignment)
+{
+  void* p = 0;
+  posix_memalign(&p, alignemtn, size);
+  return p;
+}
+#endif
+
+
+template <class T>
+inline void safeFree(T& a)
+{
+  if (a)
+    free(a);
+  a = 0;
+}
+
+template <class T>
+inline void safeAlignedFree(T& a)
+{
+  if (a)
+#if defined(__GNUC__)
+    free(a)
+#else
+    _aligned_free(a);
+#endif
+  a = 0;
+}
+
+template <class T>
+inline void safeDelete(T& a)
+{
+    if (a)
+        delete a;
+    a = 0;
+}
+
+template <class T>
+inline void safeDeleteArray(T& a)
+{
+    if (a)
+        delete [] a;
+    a = 0;
+}
+
+template <class T>
+inline void safeRenew(T& a, T obj)
+{
+    if (a)
+        delete a;
+    a = obj;
+}
+
+
+#if defined(__GNUC__)
 inline unsigned int _rdrand16_step(uint16_t* x) {
   return __builtin_ia32_rdrand16_step(x);
 }

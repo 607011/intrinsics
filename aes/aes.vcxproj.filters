@@ -21,30 +21,9 @@
     <ClCompile Include="aesni.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="openssl\aes_core.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="openssl\cbc128.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="openssl\aes-openssl.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aesni.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="openssl\aes_locl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="openssl\e_os2.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="openssl\modes.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="openssl\opensslconf.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -7,12 +7,14 @@
 #endif
 
 #include <iostream>
+#include <cassert>
 #include <iomanip>
 #include <vector>
 #include <string>
 #include <getopt.h>
 #include <limits.h>
 #include <malloc.h>
+#include <openssl/evp.h>
 #include "mersenne_twister.h"
 #include "stopwatch.h"
 #include "cpufeatures.h"
@@ -56,9 +58,13 @@ std::string CoreBindingString[_LastCoreBinding] =
 };
 
 int gIterations = DEFAULT_ITERATIONS;
-uint8_t* gPlainBuf = NULL;
-uint8_t* gEncBuf = NULL;
-uint8_t* gDecBuf = NULL;
+unsigned char* gPlainBuf = NULL;
+unsigned char* gEncBuf = NULL;
+unsigned char* gDecBuf = NULL;
+const char* gKeyData = "s3cRe7";
+const int gKeyDataLen = 6;
+EVP_CIPHER_CTX gEncCtx;
+EVP_CIPHER_CTX gDecCtx;
 int gBufSize = DEFAULT_BUF_SIZE;
 int gNumThreads[MAX_NUM_THREADS] = { DEFAULT_NUM_THREADS };
 int gMaxNumThreads = 1;
@@ -66,26 +72,34 @@ int gThreadIterations = 0;
 int gThreadPriority;
 int gNumSockets = 1;
 int gVerbose = 0;
+bool gDoCrosscrypt = true;
+ALIGN16 unsigned char gIV[32] = { 0 };
+ALIGN16 unsigned char gKey[32] = { 0 };
+char* gInFile = NULL;
+char* gOutFile = NULL;
+FILE* gIn = NULL;
+FILE* gOut = NULL;
 CoreBinding gCoreBinding = AutomaticCoreBinding;
 
-ALIGN16 uint8_t AES_CBC_IV[] = {0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f};
-ALIGN16 uint8_t AES128_TEST_KEY[] = {0x7E,0x24,0x06,0x78,0x17,0xFA,0xE0,0xD7,0x43,0xD6,0xCE,0x1F,0x32,0x53,0x91,0x63};
-ALIGN16 uint8_t AES192_TEST_KEY[] = {0x7C,0x5C,0xB2,0x40,0x1B,0x3D,0xC3,0x3C,0x19,0xE7,0x34,0x08,0x19,0xE0,0xF6,0x9C,0x67,0x8C,0x3D,0xB8,0xE6,0xF6,0xA9,0x1A};
-ALIGN16 uint8_t AES256_TEST_KEY[] = {0xF6,0xD6,0x6D,0x6B,0xD5,0x2D,0x59,0xBB,0x07,0x96,0x36,0x58,0x79,0xEF,0xF8,0x86,0xC6,0x6D,0xD5,0x1A,0x5B,0x6A,0x99,0x74,0x4B,0x50,0x59,0x0C,0x87,0xA2,0x38,0x84};
 
 enum _long_options {
   SELECT_HELP,
   SELECT_CORE_BINDING,
   SELECT_NUM_SOCKETS,
   SELECT_ITERATIONS,
-  SELECT_THREADS
+  SELECT_THREADS,
+  SELECT_IN_FILE,
+  SELECT_OUT_FILE,
+  SELECT_NO_CROSS_CRYPT
 };
 static struct option long_options[] = {
   { "core-binding",  required_argument, 0, SELECT_CORE_BINDING },
-  { "sockets",       required_argument, 0, SELECT_NUM_SOCKETS },
   { "iterations",    required_argument, 0, SELECT_ITERATIONS },
   { "threads",       required_argument, 0, SELECT_THREADS },
-  { "help",          no_argument,       0, SELECT_HELP },
+  { "in",            required_argument, 0, SELECT_IN_FILE },
+  { "out",           required_argument, 0, SELECT_OUT_FILE },
+  { "no-cross",      no_argument,       0, SELECT_NO_CROSS_CRYPT },
+  { "help",          no_argument,       0, SELECT_HELP }
 };
 
 static const unsigned int DecryptMode = 0x80000000U;
@@ -109,6 +123,8 @@ struct BenchmarkResult {
     : plainBuf(NULL)
     , encBuf(NULL)
     , decBuf(NULL)
+    , encCtx(NULL)
+    , decCtx(NULL)
     , hThread(0)
     , t(0)
     , ticks(0)
@@ -121,11 +137,15 @@ struct BenchmarkResult {
   }
   // input fields
   Method method;
-  AES_KEY encKey;
-  AES_KEY decKey;
-  uint8_t* plainBuf;
-  uint8_t* encBuf;
-  uint8_t* decBuf;
+  ALIGN16 AES_KEY encKey;
+  ALIGN16 AES_KEY decKey;
+  ALIGN16 AES_KEY_ALIGNED encKeyAligned;
+  ALIGN16 AES_KEY_ALIGNED decKeyAligned;
+  ALIGN16 unsigned char* plainBuf;
+  ALIGN16 unsigned char* encBuf;
+  ALIGN16 unsigned char* decBuf;
+  EVP_CIPHER_CTX* encCtx;
+  EVP_CIPHER_CTX* decCtx;
   int bufSize;
   int threadNum;
   HANDLE hThread;
@@ -137,6 +157,34 @@ struct BenchmarkResult {
   int64_t ticks;
 };
 
+int AES_cbc_encrypt(unsigned char* plain, unsigned char* enc, int len, const EVP_CIPHER* cipher, EVP_CIPHER_CTX *e)
+{
+  EVP_CIPHER_CTX_init(e);
+  EVP_EncryptInit_ex(e, cipher, NULL, gKey, gIV);
+  int c_len = len + AES_BLOCK_SIZE - 1, f_len = 0;
+  if (!EVP_EncryptInit_ex(e, NULL, NULL, NULL, NULL))
+    return -1;
+  if (!EVP_EncryptUpdate(e, enc, &c_len, plain, len))
+    return -2;
+  if (!EVP_EncryptFinal_ex(e, enc + c_len, &f_len))
+    return -3;
+  return c_len + f_len;
+}
+
+int AES_cbc_decrypt(unsigned char* enc, unsigned char* dec, int len, const EVP_CIPHER* cipher, EVP_CIPHER_CTX *e)
+{
+  EVP_CIPHER_CTX_init(e);
+  EVP_DecryptInit_ex(e, cipher, NULL, gKey, gIV);
+  EVP_CIPHER_CTX_set_padding(e, 0);
+  int p_len = len, f_len = 0;
+  if (!EVP_DecryptInit_ex(e, NULL, NULL, NULL, NULL))
+    return -1;
+  if (!EVP_DecryptUpdate(e, dec, &p_len, enc, len))
+    return -2;
+  if (!EVP_DecryptFinal_ex(e, dec + p_len, &f_len))
+    return -3;
+  return p_len + f_len;
+}
 
 // die im Thread laufenden Benchmark-Routine
 #if defined(WIN32)
@@ -193,39 +241,50 @@ void*
   for (int i = 0; i < result->iterations; ++i) {
     int64_t t, ticks;
     {
+      unsigned char *plain, *enc, *dec;
+      int status = 0;
+      int offset = result->threadNum * result->bufSize;
       Stopwatch stopwatch(t, ticks);
-      uint8_t *plain, *enc, *dec, offset = result->threadNum * result->bufSize;
       switch (result->method)
       {
       case AES128Enc:
         // fall-through
       case AES256Enc:
-        plain = (uint8_t*)result->plainBuf + offset;
-        enc = (uint8_t*)result->encBuf + offset;
-        AES_CBC_encrypt(plain, enc, AES_CBC_IV, result->bufSize, result->encKey.rd_key, result->encKey.rounds);
+        plain = (unsigned char*)result->plainBuf + offset;
+        enc = (unsigned char*)result->encBuf + offset;
+        AESNI_cbc_encrypt(plain, enc, gIV, result->bufSize, &result->encKeyAligned);
         break;
       case AES128Dec:
         // fall-through
       case AES256Dec:
-        enc = (uint8_t*)result->encBuf + offset;
-        dec = (uint8_t*)result->decBuf + offset;
-        AES_CBC_decrypt(enc, dec, AES_CBC_IV, result->bufSize, result->decKey.rd_key, result->decKey.rounds);
+        enc = (unsigned char*)result->encBuf + offset;
+        dec = (unsigned char*)result->decBuf + offset;
+        AESNI_cbc_decrypt(enc, dec, gIV, result->bufSize, &result->decKeyAligned);
         break;
       case OpenSSL128Enc:
-        // fall-through
+        plain = (unsigned char*)result->plainBuf + offset;
+        enc = (unsigned char*)result->encBuf + offset;
+        status = AES_cbc_encrypt(plain, enc, result->bufSize, EVP_aes_128_cbc(), result->encCtx);
+        assert(status > 0);
+        break;
       case OpenSSL256Enc:
-        plain = (uint8_t*)result->plainBuf + offset;
-        enc = (uint8_t*)result->encBuf + offset;
-        AES_CBC_encrypt_OpenSSL(plain, enc, result->bufSize, &result->encKey, AES_CBC_IV, AES_ENCRYPT);
+        plain = (unsigned char*)result->plainBuf + offset;
+        enc = (unsigned char*)result->encBuf + offset;
+        status = AES_cbc_encrypt(plain, enc, result->bufSize, EVP_aes_256_cbc(), result->encCtx);
+        assert(status > 0);
         break;
       case OpenSSL128Dec:
-        // fall-through
+        enc = (unsigned char*)result->encBuf + offset;
+        dec = (unsigned char*)result->decBuf + offset;
+        status = AES_cbc_decrypt(enc, dec, result->bufSize, EVP_aes_128_cbc(), result->decCtx);
+        break;
       case OpenSSL256Dec:
-        enc = (uint8_t*)result->encBuf + offset;
-        dec = (uint8_t*)result->encBuf + offset;
-        AES_CBC_encrypt_OpenSSL(enc, dec, result->bufSize, &result->decKey, AES_CBC_IV, AES_DECRYPT);
+        enc = (unsigned char*)result->encBuf + offset;
+        dec = (unsigned char*)result->decBuf + offset;
+        status = AES_cbc_decrypt(enc, dec, result->bufSize, EVP_aes_256_cbc(), result->decCtx);
         break;
       }
+      assert(status >= 0);
     } 
     if (t < tMin)
       tMin = t;
@@ -252,11 +311,28 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
   std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
   std::cout << ((method & DecryptMode)? "Entschluesselung" : "Verschluesselung") << " ...";
 
+  switch (method) {
+  case AES128Enc:
+  case AES128Dec:
+  case OpenSSL128Enc:
+  case OpenSSL128Dec:
+    EVP_BytesToKey(EVP_aes_128_cbc(), EVP_sha1(), NULL, (unsigned char*)gKeyData, gKeyDataLen, 5, gKey, gIV);
+    break;
+  case AES256Enc:
+  case AES256Dec:
+  case OpenSSL256Enc:
+  case OpenSSL256Dec:
+    EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), NULL, (unsigned char*)gKeyData, gKeyDataLen, 7, gKey, gIV);
+    break;
+  }
+
   for (int i = 0; i < numThreads; ++i) {
     pResult[i].threadNum = i;
     pResult[i].plainBuf = gPlainBuf;
     pResult[i].encBuf = gEncBuf;
     pResult[i].decBuf = gDecBuf;
+    pResult[i].encCtx = &gEncCtx;
+    pResult[i].decCtx = &gDecCtx;
     pResult[i].bufSize = gBufSize;
     pResult[i].iterations = gIterations;
     pResult[i].numCores = numCores;
@@ -271,29 +347,29 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
     switch (method) {
     // ENCRYPTION METHODS
     case AES128Enc:
-      status = AES_set_encrypt_key(AES128_TEST_KEY, 128, &pResult[i].encKey);
+      status = AESNI_set_encrypt_key(gKey, 128, &pResult[i].encKeyAligned);
       break;
     case OpenSSL128Enc:
-      status = AES_set_encrypt_key(AES128_TEST_KEY, 128, &pResult[i].encKey);
+      status = AES_set_encrypt_key(gKey, 128, &pResult[i].encKey);
       break;
     case AES256Enc:
-      status = AES_set_encrypt_key(AES256_TEST_KEY, 256, &pResult[i].encKey);
+      status = AESNI_set_encrypt_key(gKey, 256, &pResult[i].encKeyAligned);
       break;
     case OpenSSL256Enc:
-      status = AES_set_encrypt_key(AES256_TEST_KEY, 256, &pResult[i].encKey);
+      status = AES_set_encrypt_key(gKey, 256, &pResult[i].encKey);
       break;
     // DECRYPTION METHODS
     case AES128Dec:
-      status = AES_set_decrypt_key(AES128_TEST_KEY, 128, &pResult[i].decKey);
+      status = AESNI_set_decrypt_key(gKey, 128, &pResult[i].decKeyAligned);
       break;
     case OpenSSL128Dec:
-      status = AES_set_decrypt_key(AES128_TEST_KEY, 128, &pResult[i].decKey);
+      status = AES_set_decrypt_key(gKey, 128, &pResult[i].decKey);
       break;
     case AES256Dec:
-      status = AES_set_decrypt_key(AES256_TEST_KEY, 256, &pResult[i].decKey);
+      status = AESNI_set_decrypt_key(gKey, 256, &pResult[i].decKeyAligned);
       break;
     case OpenSSL256Dec:
-      status = AES_set_decrypt_key(AES256_TEST_KEY, 256, &pResult[i].decKey);
+      status = AES_set_decrypt_key(gKey, 256, &pResult[i].decKey);
       break;
     }
     if (status != 0)
@@ -327,13 +403,6 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
     << (float)gBufSize*gIterations/1024/1024/((float)t/Stopwatch::RESOLUTION)*numThreads << " MB/s"
     << std::setw(8) << (float)pResult[0].ticks / gBufSize
     << std::endl;
-
-#if defined(_DEBUG) && defined(VERBOSEDEBUG)
-  unsigned char* key = (method & DecryptMode)? pResult[0].decKey.rd_key : pResult[0].encKey.rd_key;
-      for (unsigned int j = 0; j < 16; ++j)
-        std::cout << std::setiosflags(std::ios::internal) << std::hex << std::setw(2) << std::setfill('0') <<  int(key[j]);
-      std::cout << std::endl;
-#endif
 
   delete [] pResult;
   delete [] hThread;
@@ -380,8 +449,8 @@ void disclaimer(void) {
 
 void clearEncDecBufs(void) {
 #if defined(WIN32)
-  RtlSecureZeroMemory(gEncBuf, gMaxNumThreads * gBufSize);
-  RtlSecureZeroMemory(gDecBuf, gMaxNumThreads * gBufSize);
+  RtlSecureZeroMemory(gEncBuf, gMaxNumThreads * (gBufSize + AES_BLOCK_SIZE - 1));
+  RtlSecureZeroMemory(gDecBuf, gMaxNumThreads * (gBufSize + AES_BLOCK_SIZE - 1));
 #elif defined(__GNUC__)
   bzero(gEncBuf, gMaxNumThreads * gBufSize);
   bzero(gDecBuf, gMaxNumThreads * gBufSize);
@@ -424,16 +493,19 @@ int main(int argc, char* argv[]) {
       if (gBufSize <= 0)
         gBufSize = DEFAULT_BUF_SIZE;
       break;
-    case SELECT_NUM_SOCKETS:
-      // fall-through
-    case 's':
+    case SELECT_IN_FILE:
       if (optarg == NULL) {
         usage();
         return EXIT_FAILURE;
       }
-      gNumSockets = atoi(optarg);
-      if (gNumSockets <= 0)
-        gNumSockets = 1;
+      gInFile = optarg;
+      break;
+    case SELECT_OUT_FILE:
+      if (optarg == NULL) {
+        usage();
+        return EXIT_FAILURE;
+      }
+      gOutFile = optarg;
       break;
     case SELECT_THREADS:
       // fall-through
@@ -450,6 +522,9 @@ int main(int argc, char* argv[]) {
           gMaxNumThreads = numThreads;
         gNumThreads[gThreadIterations++] = numThreads;
       }
+      break;
+    case SELECT_NO_CROSS_CRYPT:
+      gDoCrosscrypt = false;
       break;
     case 'v':
       ++gVerbose;
@@ -590,16 +665,26 @@ int main(int argc, char* argv[]) {
       << "//////////////////////////////////////////////////////" << std::endl;
   }
 
-  // Speicherblöcke mit Zufallszahlen belegen
-  MersenneTwister gen;
-  gen.seed();
-  if (gVerbose > 0)
-    std::cout << std::endl << "Generieren von " << gMaxNumThreads << "x" << gBufSize << " MByte ..." << std::endl;
-  gBufSize *= 1024*1024;
+  printf("OPENSSL_ia32cap = 0x%016llx\n", OPENSSL_ia32cap);
+
+  if (gInFile) {
+    gIn = fopen(gInFile, "rb");
+    if (gIn == NULL)
+      exit(-1);
+    gMaxNumThreads = 1;
+    fseek(gIn, 0L, SEEK_END);
+    gBufSize = ftell(gIn);
+    gBufSize = AES_BLOCK_SIZE * (gBufSize / AES_BLOCK_SIZE) + AES_BLOCK_SIZE;
+    fseek(gIn, 0L, SEEK_SET);
+  }
+  else {
+    gBufSize *= 1024*1024;
+  }
+
   try {
-    gPlainBuf  = new uint8_t[gMaxNumThreads * gBufSize];
-    gEncBuf = new uint8_t[gMaxNumThreads * gBufSize];
-    gDecBuf = new uint8_t[gMaxNumThreads * gBufSize];
+    gPlainBuf = (unsigned char*)_aligned_malloc(gMaxNumThreads * (gBufSize + AES_BLOCK_SIZE), AES_BLOCK_SIZE);
+    gEncBuf   = (unsigned char*)_aligned_malloc(gMaxNumThreads * (gBufSize + AES_BLOCK_SIZE), AES_BLOCK_SIZE);
+    gDecBuf   = (unsigned char*)_aligned_malloc(gMaxNumThreads * (gBufSize + AES_BLOCK_SIZE), AES_BLOCK_SIZE);
   }
   catch(...) {
     std::cerr << "FEHLER: nicht genug freier Speicher!" << std::endl;
@@ -610,10 +695,23 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  uint32_t* rn = reinterpret_cast<uint32_t*>(gPlainBuf);
-  const uint32_t* const rne = rn + gMaxNumThreads * gBufSize / sizeof(uint32_t);
-  while (rn < rne)
-    gen.next(*rn++);
+  if (gIn) {
+    if (gVerbose > 0)
+      std::cout << "Lesen von " << gBufSize << " Byte aus '" << gInFile << "' ..." << std::endl;
+    fread(gPlainBuf, gBufSize, 1, gIn);
+    fclose(gIn);
+  }
+  else {
+    // Speicherblöcke mit Zufallszahlen belegen
+    if (gVerbose > 0)
+      std::cout << std::endl << "Generieren von " << gMaxNumThreads << "x" << (gBufSize/1024/1024) << " MByte ..." << std::endl;
+    MersenneTwister gen;
+    gen.seed();
+    uint32_t* rn = reinterpret_cast<uint32_t*>(gPlainBuf);
+    const uint32_t* const rne = rn + gMaxNumThreads * gBufSize / sizeof(uint32_t);
+    while (rn < rne)
+      gen.next(*rn++);
+  }
 
 #if defined(WIN32)
   SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
@@ -627,33 +725,13 @@ int main(int argc, char* argv[]) {
       << std::endl
       << "  Methode                t/Block      Durchsatz  Zyklen" << std::endl
       << "  -----------------------------------------------------" << std::endl;
-    if (CPUFeatures::instance().isAESSupported()) {
-      clearEncDecBufs();
-      runBenchmark(numThreads, "AES128 (Intrinsic)", AES128Enc);
-      runBenchmark(numThreads, "AES128 (Intrinsic)", AES128Dec);
-      correct = memcmp(gPlainBuf, gDecBuf, gBufSize) == 0;
-      std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl << std::endl;
-
-#if defined(USE_AES_192)
-      clearEncDecBufs();
-      runBenchmark(numThreads, "AES192", AES192Enc);
-      runBenchmark(numThreads, "AES192", AES192Dec);
-      correct = memcmp(gPlainBuf, gDecBuf, gBufSize) == 0;
-      std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl << std::endl;
-#endif
-
-      clearEncDecBufs();
-      runBenchmark(numThreads, "AES256 (Intrinsic)", AES256Enc);
-      runBenchmark(numThreads, "AES256 (Intrinsic)", AES256Dec);
-      correct = memcmp(gPlainBuf, gDecBuf, gBufSize) == 0;
-      std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl << std::endl;
-    }
 
     clearEncDecBufs();
     runBenchmark(numThreads, "AES128 (OpenSSL)", OpenSSL128Enc);
     runBenchmark(numThreads, "AES128 (OpenSSL)", OpenSSL128Dec);
     correct = memcmp(gPlainBuf, gDecBuf, gBufSize) == 0;
     std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl << std::endl;
+    // writeEncBuf("aes-128-openssl");
 
     clearEncDecBufs();
     runBenchmark(numThreads, "AES256 (OpenSSL)", OpenSSL256Enc);
@@ -663,22 +741,50 @@ int main(int argc, char* argv[]) {
 
     if (CPUFeatures::instance().isAESSupported()) {
       clearEncDecBufs();
-      runBenchmark(numThreads, "AES128 (OpenSSL)", OpenSSL128Enc);
+      runBenchmark(numThreads, "AES128 (Intrinsic)", AES128Enc);
       runBenchmark(numThreads, "AES128 (Intrinsic)", AES128Dec);
       correct = memcmp(gPlainBuf, gDecBuf, gBufSize) == 0;
       std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl << std::endl;
 
       clearEncDecBufs();
-      runBenchmark(numThreads, "AES256 (OpenSSL)", OpenSSL256Enc);
+      runBenchmark(numThreads, "AES256 (Intrinsic)", AES256Enc);
       runBenchmark(numThreads, "AES256 (Intrinsic)", AES256Dec);
       correct = memcmp(gPlainBuf, gDecBuf, gBufSize) == 0;
       std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl << std::endl;
+
+      if (gDoCrosscrypt) {
+        clearEncDecBufs();
+        runBenchmark(numThreads, "AES128 (OpenSSL)", OpenSSL128Enc);
+        runBenchmark(numThreads, "AES128 (Intrinsic)", AES128Dec);
+        correct = memcmp(gPlainBuf, gDecBuf, gBufSize) == 0;
+        std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl << std::endl;
+
+        clearEncDecBufs();
+        runBenchmark(numThreads, "AES256 (OpenSSL)", OpenSSL256Enc);
+        runBenchmark(numThreads, "AES256 (Intrinsic)", AES256Dec);
+        correct = memcmp(gPlainBuf, gDecBuf, gBufSize) == 0;
+        std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl << std::endl;
+      }
     }
   }
 
-  delete [] gPlainBuf;
-  delete [] gEncBuf;
-  delete [] gDecBuf;
+  if (gOutFile) {
+    gOut = fopen(gOutFile, "wb+");
+    if (gOut == NULL)
+      exit(-1);
+    fwrite(gEncBuf, gBufSize, 1, gOut);
+    fclose(gOut);
+  }
+  
+  safeAlignedFree(gPlainBuf);
+  safeAlignedFree(gDecBuf);
+  safeAlignedFree(gEncBuf);
+  
+  EVP_CIPHER_CTX_cleanup(&gDecCtx);
+  EVP_CIPHER_CTX_cleanup(&gEncCtx);
+
+  std::cout << "Enter druecken, um zu beenden ..." << std::flush;
+  getchar();
 
   return (correct)? EXIT_SUCCESS : EXIT_FAILURE;
 }

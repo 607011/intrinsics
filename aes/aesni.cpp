@@ -4,6 +4,7 @@
 
 #include <wmmintrin.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <assert.h>
 #include "aesni.h"
 
@@ -209,21 +210,21 @@ void AES_256_Key_Expansion (const unsigned char* userkey, unsigned char* key)
   Key_Schedule[14]=temp1;
 }
 
-int AES_set_encrypt_key(const unsigned char* userKey, const int bits, AES_KEY* key)
+int AESNI_set_encrypt_key(const unsigned char* userKey, const int bits, AES_KEY_ALIGNED* key)
 {
   assert(userKey != NULL);
   assert(key != NULL);
   switch (bits) {
   case 128:
-    AES_128_Key_Expansion(userKey, key->rd_key);
+    AES_128_Key_Expansion(userKey, (unsigned char*)key->rd_key);
     key->rounds = 10;
     return 0;
   case 192:
-    AES_192_Key_Expansion(userKey, key->rd_key);
+    AES_192_Key_Expansion(userKey, (unsigned char*)key->rd_key);
     key->rounds = 12;
     return 0;
   case 256:
-    AES_256_Key_Expansion(userKey, key->rd_key);
+    AES_256_Key_Expansion(userKey, (unsigned char*)key->rd_key);
     key->rounds = 14;
     return 0;
   default:
@@ -232,14 +233,14 @@ int AES_set_encrypt_key(const unsigned char* userKey, const int bits, AES_KEY* k
   return -2;
 }
 
-int AES_set_decrypt_key(const unsigned char *userKey, const int bits, AES_KEY *key)
+int AESNI_set_decrypt_key(const unsigned char *userKey, const int bits, AES_KEY_ALIGNED *key)
 {
-  AES_KEY temp_key;
+  AES_KEY_ALIGNED temp_key;
   __m128i *Key_Schedule = (__m128i*)key->rd_key;
   __m128i *Temp_Key_Schedule = (__m128i*)temp_key.rd_key;
   if (!userKey || !key)
     return -1;
-  if (AES_set_encrypt_key(userKey,bits,&temp_key) == -2)
+  if (AESNI_set_encrypt_key(userKey, bits, &temp_key) == -2)
     return -2;
   int nr = temp_key.rounds;
   key->rounds = nr;
@@ -265,18 +266,18 @@ int AES_set_decrypt_key(const unsigned char *userKey, const int bits, AES_KEY *k
   return 0;
 }
 
-void AES_CBC_encrypt(const unsigned char* in, unsigned char* out,
-                     unsigned char ivec[16], unsigned long length,
-                     unsigned char* key, int number_of_rounds)
+void AESNI_cbc_encrypt(const unsigned char* in, unsigned char* out,
+                       unsigned char ivec[16], unsigned long length,
+                       AES_KEY_ALIGNED* key)
 {
-  assert(number_of_rounds == 10 || number_of_rounds == 12 || number_of_rounds == 14);
+  assert(key->rounds == 10 || key->rounds == 12 || key->rounds == 14);
   length = (length % 16)? length / 16 + 1 : length / 16;
   __m128i* plain = (__m128i*)in;
   const __m128i* const plainEnd = plain + length;
   __m128i* enc = (__m128i*)out;
-  const __m128i* const k = (__m128i*)key;
+  const __m128i* const k = (__m128i*)key->rd_key;
   __m128i feedback = _mm_loadu_si128((__m128i*)ivec);
-  switch (number_of_rounds) {
+  switch (key->rounds) {
   case 10:
     while (plain < plainEnd) {
       __m128i data = _mm_loadu_si128(plain++);
@@ -340,18 +341,18 @@ void AES_CBC_encrypt(const unsigned char* in, unsigned char* out,
   }
 }
 
-void AES_CBC_decrypt(const unsigned char* in, unsigned char* out,
-                     unsigned char ivec[16], unsigned long length,
-                     unsigned char* key, int number_of_rounds)
+void AESNI_cbc_decrypt(const unsigned char* in, unsigned char* out,
+                       unsigned char ivec[16], unsigned long length,
+                       AES_KEY_ALIGNED* key)
 {
-  assert(number_of_rounds == 10 || number_of_rounds == 12 || number_of_rounds == 14);
+  assert(key->rounds == 10 ||  key->rounds == 12 ||  key->rounds == 14);
   length = (length % 16)? length / 16 + 1 : length / 16;
   __m128i* enc = (__m128i*)in;
   const __m128i* const encEnd = enc + length;
   __m128i* dec = (__m128i*)out;
-  const __m128i* const k = (__m128i*)key;
+  const __m128i* const k = (__m128i*)key->rd_key;
   __m128i feedback = _mm_loadu_si128((__m128i*)ivec);
-  switch (number_of_rounds) {
+  switch ( key->rounds) {
   case 10:
     while (enc < encEnd) {
       __m128i last_in = _mm_loadu_si128(enc++);
