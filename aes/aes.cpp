@@ -61,10 +61,7 @@ int gIterations = DEFAULT_ITERATIONS;
 unsigned char* gPlainBuf = NULL;
 unsigned char* gEncBuf = NULL;
 unsigned char* gDecBuf = NULL;
-const char* gKeyData = "s3cRe7";
-const int gKeyDataLen = 6;
-EVP_CIPHER_CTX gEncCtx;
-EVP_CIPHER_CTX gDecCtx;
+char* gPassword = "s3cRe7";
 int gBufSize = DEFAULT_BUF_SIZE;
 int gNumThreads[MAX_NUM_THREADS] = { DEFAULT_NUM_THREADS };
 int gMaxNumThreads = 1;
@@ -77,8 +74,6 @@ ALIGN16 unsigned char gIV[32] = { 0 };
 ALIGN16 unsigned char gKey[32] = { 0 };
 char* gInFile = NULL;
 char* gOutFile = NULL;
-FILE* gIn = NULL;
-FILE* gOut = NULL;
 CoreBinding gCoreBinding = AutomaticCoreBinding;
 
 
@@ -90,7 +85,8 @@ enum _long_options {
   SELECT_THREADS,
   SELECT_IN_FILE,
   SELECT_OUT_FILE,
-  SELECT_NO_CROSS_CRYPT
+  SELECT_NO_CROSS_CRYPT,
+  SELECT_PASSWORD
 };
 static struct option long_options[] = {
   { "core-binding",  required_argument, 0, SELECT_CORE_BINDING },
@@ -99,6 +95,7 @@ static struct option long_options[] = {
   { "in",            required_argument, 0, SELECT_IN_FILE },
   { "out",           required_argument, 0, SELECT_OUT_FILE },
   { "no-cross",      no_argument,       0, SELECT_NO_CROSS_CRYPT },
+  { "password",      required_argument, 0, SELECT_PASSWORD },
   { "help",          no_argument,       0, SELECT_HELP }
 };
 
@@ -137,6 +134,8 @@ struct BenchmarkResult {
     if (hThread)
       CloseHandle(hThread);
 #endif
+    EVP_CIPHER_CTX_cleanup(encCtx);
+    EVP_CIPHER_CTX_cleanup(decCtx);
     safeDelete(encCtx);
     safeDelete(decCtx);
   }
@@ -317,13 +316,13 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
   case AES128Dec:
   case OpenSSL128Enc:
   case OpenSSL128Dec:
-    EVP_BytesToKey(EVP_aes_128_cbc(), EVP_sha1(), NULL, (unsigned char*)gKeyData, gKeyDataLen, 5, gKey, gIV);
+    EVP_BytesToKey(EVP_aes_128_cbc(), EVP_sha1(), NULL, (unsigned char*)gPassword, strlen(gPassword), 5, gKey, gIV);
     break;
   case AES256Enc:
   case AES256Dec:
   case OpenSSL256Enc:
   case OpenSSL256Dec:
-    EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), NULL, (unsigned char*)gKeyData, gKeyDataLen, 7, gKey, gIV);
+    EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), NULL, (unsigned char*)gPassword, strlen(gPassword), 7, gKey, gIV);
     break;
   }
 
@@ -417,10 +416,22 @@ void usage(void) {
     << std::endl
     << "Optionen:" << std::endl
     << "  -n N" << std::endl
-    << "     N MByte große Blocks generieren (Vorgabe: " << DEFAULT_BUF_SIZE << ")" << std::endl
+    << "     N MByte grosse Bloecke generieren (Vorgabe: " << DEFAULT_BUF_SIZE << ")" << std::endl
     << std::endl
     << "  (--iterations|-i) N" << std::endl
-    << "     Generieren N Mal wiederholen (Vorgabe: " << DEFAULT_ITERATIONS << ")" << std::endl
+    << "     Ver-/Entschluesseln N Mal wiederholen (Vorgabe: " << DEFAULT_ITERATIONS << ")" << std::endl
+    << std::endl
+    << "  --in Dateiname" << std::endl
+    << "     Lesen des Klartextes aus Datei" << std::endl
+    << std::endl
+    << "  --out Dateiname" << std::endl
+    << "     Schreiben der verschluesselten Daten in Datei" << std::endl
+    << std::endl
+    << "  (-p|--password) PASSWORD" << std::endl
+    << "     Verwenden eines eigenen Passworts zur Verschluesselung statt `" << gPassword << "`" << std::endl
+    << std::endl
+    << "  --no-cross" << std::endl
+    << "     Verschluesseln mit OpenSSL und Entschluesseln mit AES-NI unterlassen" << std::endl
     << std::endl
     << "  (--core-binding|-b) (linear|evenfirst|oddfirst|none|auto)" << std::endl
     << "     Modus, nach dem Threads an logische CPU-Kerne gebunden werden" << std::endl
@@ -668,17 +679,22 @@ int main(int argc, char* argv[]) {
       << "//////////////////////////////////////////////////////" << std::endl;
   }
 
-  printf("OPENSSL_ia32cap = 0x%016llx\n", OPENSSL_ia32cap);
+  
+  volatile unsigned long __cpuFeatures = OPENSSL_ia32cap_loc()[0];
+  std::cout.setf(std::ios::internal);
+  if (gVerbose > 1)
+    std::cout << "OPENSSL_ia32cap: 0x" << std::hex << std::setw(8) << std::setfill('0') << __cpuFeatures << std::dec << std::endl;
 
+  FILE* fIn = NULL;
   if (gInFile) {
-    gIn = fopen(gInFile, "rb");
-    if (gIn == NULL)
+    fIn = fopen(gInFile, "rb");
+    if (fIn == NULL)
       exit(-1);
     gMaxNumThreads = 1;
-    fseek(gIn, 0L, SEEK_END);
-    gBufSize = ftell(gIn);
+    fseek(fIn, 0L, SEEK_END);
+    gBufSize = ftell(fIn);
     gBufSize = AES_BLOCK_SIZE * (gBufSize / AES_BLOCK_SIZE) + AES_BLOCK_SIZE;
-    fseek(gIn, 0L, SEEK_SET);
+    fseek(fIn, 0L, SEEK_SET);
   }
   else {
     gBufSize *= 1024*1024;
@@ -698,11 +714,11 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  if (gIn) {
+  if (fIn) {
     if (gVerbose > 0)
       std::cout << "Lesen von " << gBufSize << " Byte aus '" << gInFile << "' ..." << std::endl;
-    fread(gPlainBuf, gBufSize, 1, gIn);
-    fclose(gIn);
+    fread(gPlainBuf, gBufSize, 1, fIn);
+    fclose(fIn);
   }
   else {
     // Speicherblöcke mit Zufallszahlen belegen
@@ -767,26 +783,35 @@ int main(int argc, char* argv[]) {
         runBenchmark(numThreads, "AES256 (Intrinsic)", AES256Dec);
         correct = memcmp(gPlainBuf, gDecBuf, gBufSize) == 0;
         std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl << std::endl;
+
+        clearEncDecBufs();
+        runBenchmark(numThreads, "AES128 (Intrinsic)", AES128Enc);
+        runBenchmark(numThreads, "AES128 (OpenSSL)", OpenSSL128Dec);
+        correct = memcmp(gPlainBuf, gDecBuf, gBufSize) == 0;
+        std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl << std::endl;
+
+        clearEncDecBufs();
+        runBenchmark(numThreads, "AES256 (Intrinsic)", AES256Enc);
+        runBenchmark(numThreads, "AES256 (OpenSSL)", OpenSSL256Dec);
+        correct = memcmp(gPlainBuf, gDecBuf, gBufSize) == 0;
+        std::cout << "  " << (correct? "OK." : ">>>FAIL<<<") << std::endl << std::endl;
       }
     }
   }
 
   if (gOutFile) {
-    gOut = fopen(gOutFile, "wb+");
-    if (gOut == NULL)
+    FILE* fOut = fopen(gOutFile, "wb+");
+    if (fOut == NULL)
       exit(-1);
-    fwrite(gEncBuf, gBufSize, 1, gOut);
-    fclose(gOut);
+    fwrite(gEncBuf, gBufSize, 1, fOut);
+    fclose(fOut);
   }
   
   safeAlignedFree(gPlainBuf);
   safeAlignedFree(gDecBuf);
   safeAlignedFree(gEncBuf);
-  
-  EVP_CIPHER_CTX_cleanup(&gDecCtx);
-  EVP_CIPHER_CTX_cleanup(&gEncCtx);
 
-  std::cout << "Enter druecken, um zu beenden ..." << std::flush;
+  std::cout << "Zum Beenden Enter druecken ..." << std::flush;
   getchar();
 
   return (correct)? EXIT_SUCCESS : EXIT_FAILURE;
