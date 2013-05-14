@@ -123,17 +123,22 @@ struct BenchmarkResult {
     : plainBuf(NULL)
     , encBuf(NULL)
     , decBuf(NULL)
-    , encCtx(NULL)
-    , decCtx(NULL)
+    , encCtx(new EVP_CIPHER_CTX)
+    , decCtx(new EVP_CIPHER_CTX)
     , hThread(0)
     , t(0)
     , ticks(0)
-  { /* ... */ }
+  { 
+    EVP_CIPHER_CTX_init(encCtx);
+    EVP_CIPHER_CTX_init(decCtx);
+  }
   ~BenchmarkResult() {
 #ifdef WIN32
     if (hThread)
       CloseHandle(hThread);
 #endif
+    safeDelete(encCtx);
+    safeDelete(decCtx);
   }
   // input fields
   Method method;
@@ -159,8 +164,6 @@ struct BenchmarkResult {
 
 int AES_cbc_encrypt(unsigned char* plain, unsigned char* enc, int len, const EVP_CIPHER* cipher, EVP_CIPHER_CTX *e)
 {
-  EVP_CIPHER_CTX_init(e);
-  EVP_EncryptInit_ex(e, cipher, NULL, gKey, gIV);
   int c_len = len + AES_BLOCK_SIZE - 1, f_len = 0;
   if (!EVP_EncryptInit_ex(e, NULL, NULL, NULL, NULL))
     return -1;
@@ -173,8 +176,6 @@ int AES_cbc_encrypt(unsigned char* plain, unsigned char* enc, int len, const EVP
 
 int AES_cbc_decrypt(unsigned char* enc, unsigned char* dec, int len, const EVP_CIPHER* cipher, EVP_CIPHER_CTX *e)
 {
-  EVP_CIPHER_CTX_init(e);
-  EVP_DecryptInit_ex(e, cipher, NULL, gKey, gIV);
   EVP_CIPHER_CTX_set_padding(e, 0);
   int p_len = len, f_len = 0;
   if (!EVP_DecryptInit_ex(e, NULL, NULL, NULL, NULL))
@@ -331,8 +332,6 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
     pResult[i].plainBuf = gPlainBuf;
     pResult[i].encBuf = gEncBuf;
     pResult[i].decBuf = gDecBuf;
-    pResult[i].encCtx = &gEncCtx;
-    pResult[i].decCtx = &gDecCtx;
     pResult[i].bufSize = gBufSize;
     pResult[i].iterations = gIterations;
     pResult[i].numCores = numCores;
@@ -350,12 +349,14 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
       status = AESNI_set_encrypt_key(gKey, 128, &pResult[i].encKeyAligned);
       break;
     case OpenSSL128Enc:
+      EVP_EncryptInit_ex(pResult[i].encCtx, EVP_aes_128_cbc(), NULL, gKey, gIV);
       status = AES_set_encrypt_key(gKey, 128, &pResult[i].encKey);
       break;
     case AES256Enc:
       status = AESNI_set_encrypt_key(gKey, 256, &pResult[i].encKeyAligned);
       break;
     case OpenSSL256Enc:
+      EVP_EncryptInit_ex(pResult[i].encCtx, EVP_aes_256_cbc(), NULL, gKey, gIV);
       status = AES_set_encrypt_key(gKey, 256, &pResult[i].encKey);
       break;
     // DECRYPTION METHODS
@@ -363,12 +364,14 @@ void runBenchmark(int numThreads, const char* strMethod, const Method method) {
       status = AESNI_set_decrypt_key(gKey, 128, &pResult[i].decKeyAligned);
       break;
     case OpenSSL128Dec:
+      EVP_DecryptInit_ex(pResult[i].decCtx, EVP_aes_128_cbc(), NULL, gKey, gIV);
       status = AES_set_decrypt_key(gKey, 128, &pResult[i].decKey);
       break;
     case AES256Dec:
       status = AESNI_set_decrypt_key(gKey, 256, &pResult[i].decKeyAligned);
       break;
     case OpenSSL256Dec:
+      EVP_DecryptInit_ex(pResult[i].decCtx, EVP_aes_256_cbc(), NULL, gKey, gIV);
       status = AES_set_decrypt_key(gKey, 256, &pResult[i].decKey);
       break;
     }
