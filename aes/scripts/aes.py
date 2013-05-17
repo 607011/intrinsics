@@ -38,48 +38,67 @@ S = [
     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16,
 ]
 
+
 def RotWord(w):
     return w[1:] + w[:1]
+
+
+def ShiftRows(state):
+    assert len(state) == 4
+    RotWord(state[0])
+    RotWord(state[1])
+    RotWord(state[2])
+    RotWord(state[3])
+
 
 def SubWord(w):
     return list(map(lambda x: S[x], list(w)))
 
+
 def XorWord(a, b):
     return list(map(lambda x, y: x ^ y, list(a), list(b)))
+
+
+def SubBytes(state):
+    assert len(state) == 4
+    for i in range(4):
+        state[i] = SubWord(state[i])
+
 
 """
     key: bytearray
 """
-def KeyToBlock(key):
-    keylen = len(key) * 8
-    n = keylen // 32
+def ToState(key):
+    keyLen = len(key) * 8
+    n = keyLen // 32
     block = [ [ None for i in range(4) ] for j in range(n) ]
     k, i = 0, 0
     while i < n:
         j = 0
         while j < 4:
             block[i][j] = key[k]
-            j, k = j + 1, k + 1
-        i = i + 1
+            j += 1
+            k += 1
+        i += 1
     return block
 
 """
     key: bytearray
 """
 def ExpandKey(key):
-    block = KeyToBlock(key)
-    keylen = len(key) * 8
-    if keylen == 128: Nr = 10
-    elif keylen == 192: Nr = 12
-    elif keylen == 256: Nr = 14
+    block = ToState(key)
+    keyLen = len(key) * 8
+    if keyLen == 128: Nr = 10
+    elif keyLen == 192: Nr = 12
+    elif keyLen == 256: Nr = 14
     else: raise Exception("key size must be 128, 192 or 256 bits")
     Nb = 4
-    Nk = keylen // 32
+    Nk = keyLen // 32
     i = 0
     w = []
     while i < Nk:
         w.append(block[i])
-        i = i + 1
+        i += 1
     i = Nk
     while i < Nb * (Nr+1):
         print(str(i) + "\t", end="")
@@ -91,7 +110,7 @@ def ExpandKey(key):
             PrintWord(temp, " ")
             temp = SubWord(temp)
             PrintWord(temp, " ")
-            PrintWord(Rcon[i//Nk]); print(" ", end="")
+            PrintWord(Rcon[i//Nk], " ")
             temp = XorWord(temp, Rcon[i//Nk])
             PrintWord(temp, " ")
         elif Nk > 6 and (i % Nk) == 4:
@@ -99,36 +118,43 @@ def ExpandKey(key):
             print(9*" ", end=""); PrintWord(temp); print(19*" ", end="")
         else: print(36*" ", end="")
         PrintWord(w[i-Nk], " ")
-        xored = XorWord(w[i-Nk], temp)
-        PrintWord(xored); print(" ", end="")
-        w.append(xored)
-        i = i + 1
+        XORed = XorWord(w[i-Nk], temp)
+        PrintWord(XORed, " ")
+        w.append(XORed)
+        i += 1
         print()
-    return w
-
-
-def Mul123(a, b):
-    if b == 1: return a & 0xff
-    elif b == 2:
-        c = a << 1
-        if a & 0x80: c ^= 0x1b
-        return c & 0xff
-    elif b == 3: return Mul123(a, 2) ^ a
-    else: raise Exception("b must be 1, 2 or 3")
-
-
-def mix(a, b, c, d):
-    r0 = Mul123(a, 2) ^ Mul123(b, 3) ^ Mul123(c, 1) ^ Mul123(d, 1)
-    r1 = Mul123(a, 1) ^ Mul123(b, 2) ^ Mul123(c, 3) ^ Mul123(d, 1)
-    r2 = Mul123(a, 1) ^ Mul123(b, 1) ^ Mul123(c, 2) ^ Mul123(d, 3)
-    r3 = Mul123(a, 3) ^ Mul123(b, 1) ^ Mul123(c, 1) ^ Mul123(d, 2)
-    return r0, r1, r2, r3
+    return Nr, w
 
 
 def MixColumns(m):
+    assert len(m) == 4
+
+    def mix(a, b, c, d):
+        def Mul123(a, b):
+            if b == 1: return a & 0xff
+            elif b == 2:
+                c = a << 1
+                if a & 0x80: c ^= 0x1b
+                return c & 0xff
+            elif b == 3: return Mul123(a, 2) ^ a
+            else: raise Exception("b must be 1, 2 or 3")
+
+        r0 = Mul123(a, 2) ^ Mul123(b, 3) ^ Mul123(c, 1) ^ Mul123(d, 1)
+        r1 = Mul123(a, 1) ^ Mul123(b, 2) ^ Mul123(c, 3) ^ Mul123(d, 1)
+        r2 = Mul123(a, 1) ^ Mul123(b, 1) ^ Mul123(c, 2) ^ Mul123(d, 3)
+        r3 = Mul123(a, 3) ^ Mul123(b, 1) ^ Mul123(c, 1) ^ Mul123(d, 2)
+        return r0, r1, r2, r3
+
     transposed = list(zip(*m))
     m = map(lambda x: mix(x[0], x[1], x[2], x[3]), transposed)
     return list(zip(*m))
+
+
+def AddRoundKey(state, key):
+    assert len(state) == 4
+    assert len(key) == 4
+    for i in range(4):
+        state[i] = XorWord(state[i], key[i])
 
 
 def PrintArray(m, *args):
@@ -136,9 +162,53 @@ def PrintArray(m, *args):
     print(str(list(map(lambda x: hex(x), m))))
 
 
-def ByteToHex(a):
+def ByteToHex(x):
+    assert 0x00 <= x <= 0xff
     def ToHex(n): return "0123456789abcdef"[n]
-    return "".join([ ToHex(a >> 4), ToHex(a & 0x0f) ])
+    return "".join([ ToHex(x >> 4), ToHex(x & 0x0f) ])
+
+
+def AESEncrypt(msg, key):
+    """
+    :param msg: bytearray
+    :param key: key
+    """
+    keyLen = len(key) * 8
+    if keyLen == 128: Nr = 10
+    elif keyLen == 192: Nr = 12
+    elif keyLen == 256: Nr = 14
+    else: raise Exception("key size must be 128, 192 or 256 bits")
+
+    def AESEncryptBlock(state, w, Nr):
+        Nb = 4
+        AddRoundKey(state, w[:Nb])
+        for round in range(Nr):
+            state = SubBytes(state)
+            state = ShiftRows(state)
+            state = MixColumns(state)
+            state = AddRoundKey(state, w[round*Nb:(round+1)*Nb])
+        state = SubBytes(state)
+        state = ShiftRows(state)
+        state = AddRoundKey(state, w[Nr*Nb:(Nr+1)*Nb])
+
+    Nr, w = ExpandKey(key)
+    padding = len(msg) % 16
+    if padding != 0:
+        msg += bytearray(16-padding)
+    encrypted = bytearray(len(msg))
+    for p in range(0, len(msg), 16):
+        state = ToState(msg[p:p+16])
+        AESEncryptBlock(state, w, Nr)
+        k, i = p, 0
+        while i < 4:
+            j = 0
+            while j < 4:
+                encrypted[k] = state[i][j]
+                j += 1
+                k += 1
+            i += 1
+
+    return encrypted
 
 
 def PrintWord(w, *args):
@@ -156,7 +226,8 @@ def PrintKeySchedule(m):
     while i < Nr:
         print("ROUND KEY ", i);
         PrintMatrix(m[i*4:j*4])
-        i, j = i + 1, j + 1
+        i += 1
+        j += 1
 
 
 def PBKDF2(P, S, C, kLen):
@@ -165,14 +236,14 @@ def PBKDF2(P, S, C, kLen):
         N = len(dst)
         for i in range(N):
             dst[i] ^= src[i]
-    S = S.encode("utf-8")
-    P = P.encode("utf-8")
+    S = S.encode()
+    P = P.encode()
     m = hashlib.sha224(P)
     hLen = m.digest_size * 8
     length = ceil(kLen / hLen)
     mk = bytearray()
     for i in range(length):
-        m.update(S + str(i).encode("utf-8"))
+        m.update(S + str(i).encode())
         T = bytearray(m.digest_size)
         for j in range(C):
             m.update(P)
@@ -182,12 +253,12 @@ def PBKDF2(P, S, C, kLen):
 
 
 def PasswordToKey(password):
-    return PBKDF2(password, "", 17, 128)
+    return PBKDF2(password, "", 10, 128)
 
 
 def demo():
     key = PasswordToKey("s3cR37")
-    print(list(map(lambda x: hex(x), key)))
+    print("key = {0:s}".format(" ".join(map(lambda x: ByteToHex(x), key))))
 
     # key = bytearray.fromhex("f6 c5 82 03 cc 55 54 ad 34 c5 26 3e cd 41 02 cd")
     # key = bytearray.fromhex("2b 7e 15 16 28 ae d2 a6 ab f7 15 88 09 cf 4f 3c")
@@ -195,20 +266,10 @@ def demo():
     # key = bytearray.fromhex("60 3d eb 10 15 ca 71 be 2b 73 ae f0 85 7d 77 81 1f 35 2c 07 3b 61 08 d7 2d 98 10 a3 09 14 df f4")
 
     print("KEY SCHEDULE")
-    PrintKeySchedule(ExpandKey(key))
+    Nr, w = ExpandKey(key)
+    PrintKeySchedule(w)
 
-
-    print("MixColumns")
-    state = [
-        [ 0xa9, 0x91, 0xa1, 0xa3 ],
-        [ 0xf7, 0xfd, 0x64, 0xa7 ],
-        [ 0xb1, 0xb2, 0x85, 0xc8 ],
-        [ 0xbd, 0x55, 0xef, 0x85 ]
-    ]
-    print("  Vorher:")
-    PrintMatrix(state)
-    print("  Nachher:")
-    PrintMatrix(MixColumns(state))
+    AESEncrypt("AES ist cool!".encode(), key)
 
 
 def main():
