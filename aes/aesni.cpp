@@ -4,7 +4,6 @@
 
 #include <wmmintrin.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <assert.h>
 #include "aesni.h"
 
@@ -92,15 +91,15 @@ void AES_192_Key_Expansion(const unsigned char* userkey, unsigned char* key)
   assert(key != NULL);
 #if defined(USE_AES_192)
   __m128i temp1, temp2, temp3, temp4;
-  __m128i *Key_Schedule = (__m128d*)key;
+  __m128i *Key_Schedule = (__m128i*)key;
   temp1 = _mm_loadu_si128((__m128i*)userkey);
   temp3 = _mm_loadu_si128((__m128i*)(userkey+16));
   Key_Schedule[0] = temp1;
   Key_Schedule[1] = temp3;
   temp2 = _mm_aeskeygenassist_si128(temp3, 0x1);
   KEY_192_ASSIST(&temp1, &temp2, &temp3);
-  Key_Schedule[1] = (__m128i)_mm_shuffle_pd(Key_Schedule[1], temp1, 0);
-  Key_Schedule[2] = (__m128i)_mm_shuffle_pd(temp1, temp3, 1);
+  Key_Schedule[1] = (__m128i)_mm_shuffle_pd((__m128d)Key_Schedule[1], (__m128d)temp1, 0);
+  Key_Schedule[2] = (__m128i)_mm_shuffle_pd((__m128d)temp1, (__m128d)temp3, 1);
   temp2 = _mm_aeskeygenassist_si128(temp3,0x2);
   KEY_192_ASSIST(&temp1, &temp2, &temp3);
   Key_Schedule[3] = temp1;

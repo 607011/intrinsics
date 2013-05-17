@@ -1,4 +1,3 @@
-// Copyright (c) 2010 Intel Corporation
 // Copyright (c) 2013 Oliver Lau <ola@ct.de>, Heise Zeitschriften Verlag
 // All rights reserved.
 
@@ -22,8 +21,7 @@ struct AES_KEY_ALIGNED {
   }
   ~AES_KEY_ALIGNED()
   {
-    if (rd_key)
-      _aligned_free(rd_key);
+    safeAlignedFree(rd_key);
   }
   ALIGN16 unsigned char* rd_key;
   ALIGN16 unsigned int rounds;
