@@ -43,44 +43,48 @@ def RotWord(w):
     return w[1:] + w[:1]
 
 
-def ShiftRows(state):
-    assert len(state) == 4
-    RotWord(state[0])
-    RotWord(state[1])
-    RotWord(state[2])
-    RotWord(state[3])
-
-
 def SubWord(w):
     return list(map(lambda x: S[x], list(w)))
 
 
 def XorWord(a, b):
+    assert len(a) == 4 and len(b) == 4
     return list(map(lambda x, y: x ^ y, list(a), list(b)))
 
 
 def SubBytes(state):
     assert len(state) == 4
-    for i in range(4):
-        state[i] = SubWord(state[i])
+    return list(map(lambda x: SubWord(x), state))
+
+
+def ShiftRows(state):
+    assert len(state) == 4
+    return list(map(lambda x: RotWord(x), state))
+
+
+def AddRoundKey(state, key):
+    assert len(state) == 4 and len(key) == 4
+    return list(map(lambda x, y: XorWord(x, y), state, key))
 
 
 """
     key: bytearray
 """
-def ToState(key):
-    keyLen = len(key) * 8
+def ToState(data):
+    assert len(data) % 4 == 0
+    keyLen = len(data) * 8
     n = keyLen // 32
     block = [ [ None for i in range(4) ] for j in range(n) ]
     k, i = 0, 0
     while i < n:
         j = 0
         while j < 4:
-            block[i][j] = key[k]
+            block[i][j] = data[k]
             j += 1
             k += 1
         i += 1
     return block
+
 
 """
     key: bytearray
@@ -150,13 +154,6 @@ def MixColumns(m):
     return list(zip(*m))
 
 
-def AddRoundKey(state, key):
-    assert len(state) == 4
-    assert len(key) == 4
-    for i in range(4):
-        state[i] = XorWord(state[i], key[i])
-
-
 def PrintArray(m, *args):
     if len(args) > 0: print(args[0], end="")
     print(str(list(map(lambda x: hex(x), m))))
@@ -181,7 +178,7 @@ def AESEncrypt(msg, key):
 
     def AESEncryptBlock(state, w, Nr):
         Nb = 4
-        AddRoundKey(state, w[:Nb])
+        state = AddRoundKey(state, w[:Nb])
         for round in range(Nr):
             state = SubBytes(state)
             state = ShiftRows(state)
@@ -190,6 +187,7 @@ def AESEncrypt(msg, key):
         state = SubBytes(state)
         state = ShiftRows(state)
         state = AddRoundKey(state, w[Nr*Nb:(Nr+1)*Nb])
+        return state
 
     Nr, w = ExpandKey(key)
     padding = len(msg) % 16
@@ -198,7 +196,7 @@ def AESEncrypt(msg, key):
     encrypted = bytearray(len(msg))
     for p in range(0, len(msg), 16):
         state = ToState(msg[p:p+16])
-        AESEncryptBlock(state, w, Nr)
+        state = AESEncryptBlock(state, w, Nr)
         k, i = p, 0
         while i < 4:
             j = 0
@@ -269,8 +267,8 @@ def demo():
     Nr, w = ExpandKey(key)
     PrintKeySchedule(w)
 
-    AESEncrypt("AES ist cool!".encode(), key)
-
+    encrypted = AESEncrypt("AES ist cool!".encode(), key)
+    PrintArray(encrypted)
 
 def main():
     demo()
