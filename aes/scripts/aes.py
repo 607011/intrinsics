@@ -190,9 +190,7 @@ def AESEncrypt(msg, key):
         return state
 
     Nr, w = ExpandKey(key)
-    padding = len(msg) % 16
-    if padding != 0:
-        msg += bytearray(16-padding)
+    msg += bytearray(16 - len(msg) % 16) # pad if needed
     encrypted = bytearray(len(msg))
     for p in range(0, len(msg), 16):
         state = ToState(msg[p:p+16])
@@ -255,7 +253,7 @@ def PasswordToKey(password):
 
 
 def demo():
-    key = PasswordToKey("s3cR37")
+    key = PasswordToKey("s3cR€7")
     print("key = {0:s}".format(" ".join(map(lambda x: ByteToHex(x), key))))
 
     # key = bytearray.fromhex("f6 c5 82 03 cc 55 54 ad 34 c5 26 3e cd 41 02 cd")
