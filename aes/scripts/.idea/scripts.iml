@@ -2,7 +2,7 @@
 <module type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$" />
-    <orderEntry type="jdk" jdkName="Python 3.2 (C:/Python32/python.exe)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.2.2 (D:/Developer/Python32/pythonw3.2.exe)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

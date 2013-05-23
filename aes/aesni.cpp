@@ -359,7 +359,7 @@ void AESNI_cbc_decrypt(const unsigned char* in, unsigned char* out,
       data = _mm_aesdec_si128(data, k[1]);
       data = _mm_aesdec_si128(data, k[2]);
       data = _mm_aesdec_si128(data, k[3]);
-      data = _mm_aesdec_si128(data, k[4]);
+      data = _mm_aesdec_si128(data, k[4]);  
       data = _mm_aesdec_si128(data, k[5]);
       data = _mm_aesdec_si128(data, k[6]);
       data = _mm_aesdec_si128(data, k[7]);

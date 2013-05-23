@@ -15,6 +15,7 @@
 #endif
 
 struct AES_KEY_ALIGNED {
+#if 1
   AES_KEY_ALIGNED(void) 
   {
     rd_key = (unsigned char*)_aligned_malloc(15*16, 16);
@@ -24,6 +25,9 @@ struct AES_KEY_ALIGNED {
     safeAlignedFree(rd_key);
   }
   ALIGN16 unsigned char* rd_key;
+#else
+  unsigned char rd_key[15*16];
+#endif
   ALIGN16 unsigned int rounds;
 };
 

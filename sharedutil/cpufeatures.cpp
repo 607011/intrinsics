@@ -311,13 +311,14 @@ bool CPUFeatures::isAuthenticAMDCPU(void) const {
 
 
 bool CPUFeatures::isCRCSupported(void) const {
-  return isGenuineIntelCPU() && sse42_supported;
+  return sse42_supported;
 }
 
 
 bool CPUFeatures::isAESSupported(void) const {
-  return isGenuineIntelCPU() && aes_supported;
+  return aes_supported;
 }
+
 
 bool CPUFeatures::isRdRandSupported(void) const {
   return isGenuineIntelCPU() && rdrand_supported;
